@@ -264,8 +264,10 @@ fn main() -> Result<()> {
         output_fields.push(field_definition);
     }
 
-    let (tx, rx) =
-        mpsc::sync_channel::<(Vec<BandValue>, Vec<(f64, f64, Vec<Option<FieldValue>>)>)>(128);
+    let (tx, rx) = mpsc::sync_channel::<(
+        Vec<BandValue>,
+        Vec<(usize, usize, f64, f64, Vec<Option<FieldValue>>)>,
+    )>(128);
     let output_thread = thread::spawn(move || {
         let mut output =
             DriverManager::get_driver_by_name("GPKG")?.create_vector_only("output.gpkg")?;
@@ -286,7 +288,7 @@ fn main() -> Result<()> {
             println!("got {} points", points.len());
             let tx = output.start_transaction()?;
             let output_layer = tx.layer(0)?;
-            for (idx, (x, y, fields)) in points.into_iter().enumerate() {
+            for (idx, (_bx, _by, x, y, fields)) in points.into_iter().enumerate() {
                 let mut feature = Feature::new(output_layer.defn())?;
                 let field_offset = fields.len();
                 for (field_idx, field_value) in fields.into_iter().enumerate() {
@@ -339,12 +341,7 @@ fn main() -> Result<()> {
             block_reducer.push_block(band_idx, block);
         }
 
-        let (sample_values, points) = block_reducer.finalize();
-        let field_values = points
-            .into_iter()
-            .map(|p| (p.2, p.3, p.4))
-            .collect::<Vec<_>>();
-        tx.send((sample_values, field_values))?;
+        tx.send(block_reducer.finalize())?;
     }
 
     drop(tx);
