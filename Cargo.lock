@@ -65,6 +65,7 @@ dependencies = [
  "anyhow",
  "gdal",
  "gdal-sys",
+ "ndarray",
 ]
 
 [[package]]

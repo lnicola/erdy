@@ -4,13 +4,14 @@ use std::{collections::HashMap, sync::mpsc, thread};
 
 use anyhow::Result;
 use gdal::{
-    raster::GdalDataType,
+    raster::{GdalDataType, RasterBand},
     spatial_ref::SpatialRef,
     vector::{
         Feature, FieldDefn, FieldValue, Geometry, LayerAccess, OGRFieldType, OGRwkbGeometryType,
     },
     Dataset, DriverManager, GeoTransformEx, LayerOptions, Metadata,
 };
+use ndarray::Array2;
 
 use crate::feature_ext::FeatureExt;
 
@@ -38,6 +39,35 @@ impl FieldDefinition {
             field_defn.set_precision(precision);
         }
         Ok(field_defn)
+    }
+}
+
+#[derive(Debug)]
+enum TypedBlock {
+    U16(Array2<u16>),
+    I16(Array2<i16>),
+    F32(Array2<f32>),
+}
+
+fn read_typed_block<'d>(
+    band: &RasterBand<'d>,
+    x: usize,
+    y: usize,
+) -> gdal::errors::Result<TypedBlock> {
+    match band.band_type() {
+        GdalDataType::UInt16 => {
+            let buf = band.read_block::<u16>((x, y))?;
+            Ok(TypedBlock::U16(buf))
+        }
+        GdalDataType::Int16 => {
+            let buf = band.read_block::<i16>((x, y))?;
+            Ok(TypedBlock::I16(buf))
+        }
+        GdalDataType::Float32 => {
+            let buf = band.read_block::<f32>((x, y))?;
+            Ok(TypedBlock::F32(buf))
+        }
+        _ => unimplemented!(),
     }
 }
 
@@ -169,29 +199,26 @@ fn main() -> Result<()> {
         let mut sample_values = vec![BandValue::I16(0); points.len() * band_count];
         for band_idx in 0..band_count {
             let band = image.rasterband(band_idx as isize + 1)?;
-            match band.band_type() {
-                GdalDataType::UInt16 => {
-                    let buf = band.read_block::<u16>((block_x, block_y))?;
+            let block = read_typed_block(&band, block_x, block_y)?;
+            match block {
+                TypedBlock::U16(buf) => {
                     for (idx, &(bx, by, ..)) in points.iter().enumerate() {
                         let pix = buf[(by, bx)];
                         sample_values[band_count * idx + band_idx] = BandValue::U16(pix);
                     }
                 }
-                GdalDataType::Int16 => {
-                    let buf = band.read_block::<i16>((block_x, block_y))?;
+                TypedBlock::I16(buf) => {
                     for (idx, &(bx, by, ..)) in points.iter().enumerate() {
                         let pix = buf[(by, bx)];
                         sample_values[band_count * idx + band_idx] = BandValue::I16(pix);
                     }
                 }
-                GdalDataType::Float32 => {
-                    let buf = band.read_block::<f32>((block_x, block_y))?;
+                TypedBlock::F32(buf) => {
                     for (idx, &(bx, by, ..)) in points.iter().enumerate() {
                         let pix = buf[(by, bx)];
                         sample_values[band_count * idx + band_idx] = BandValue::F32(pix);
                     }
                 }
-                _ => unimplemented!(),
             }
         }
         let field_values = points
