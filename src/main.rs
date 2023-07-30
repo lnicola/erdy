@@ -59,9 +59,8 @@ fn main() -> Result<()> {
     let mut layer = point_ds.layer(0)?;
     dbg!(layer.feature_count());
     for feature in layer.features() {
-        let geometry = feature.geometry().unwrap().clone();
-        let (x, y, _) = geometry.get_point(0);
-        let (x, y) = geo_transform.apply(x, y);
+        let (orig_x, orig_y, _) = feature.geometry().as_ref().unwrap().get_point(0);
+        let (x, y) = geo_transform.apply(orig_x, orig_y);
         let (block_x, block_y) = (
             (x / block_size.0 as f64) as usize,
             (y / block_size.1 as f64) as usize,
@@ -70,7 +69,8 @@ fn main() -> Result<()> {
         tile_points.entry((block_x, block_y)).or_default().push((
             x % block_size.0,
             y % block_size.1,
-            geometry,
+            orig_x,
+            orig_y,
             feature.fields().map(|f| f.1).collect::<Vec<_>>(),
         ));
     }
@@ -107,7 +107,7 @@ fn main() -> Result<()> {
     }
 
     let (tx, rx) =
-        mpsc::sync_channel::<(Vec<BandValue>, Vec<(Vec<u8>, Vec<Option<FieldValue>>)>)>(128);
+        mpsc::sync_channel::<(Vec<BandValue>, Vec<(f64, f64, Vec<Option<FieldValue>>)>)>(128);
     let output_thread = thread::spawn(move || {
         let mut output =
             DriverManager::get_driver_by_name("GPKG")?.create_vector_only("output.gpkg")?;
@@ -127,7 +127,7 @@ fn main() -> Result<()> {
         for (sample_values, points) in rx {
             let tx = output.start_transaction()?;
             let output_layer = tx.layer(0)?;
-            for (idx, (wkb, fields)) in points.into_iter().enumerate() {
+            for (idx, (x, y, fields)) in points.into_iter().enumerate() {
                 let mut feature = Feature::new(output_layer.defn())?;
                 let field_offset = fields.len();
                 for (field_idx, field_value) in fields.into_iter().enumerate() {
@@ -151,7 +151,8 @@ fn main() -> Result<()> {
                         }
                     }
                 }
-                let geometry = Geometry::from_wkb(&wkb)?;
+                let mut geometry = Geometry::empty(OGRwkbGeometryType::wkbPoint)?;
+                geometry.add_point_2d((x, y));
                 feature.set_geometry(geometry)?;
                 feature.create(&output_layer)?;
             }
@@ -195,8 +196,8 @@ fn main() -> Result<()> {
         }
         let field_values = points
             .into_iter()
-            .map(|p| -> Result<(Vec<u8>, Vec<Option<FieldValue>>)> { Ok((p.2.wkb()?, p.3)) })
-            .collect::<Result<Vec<_>>>()?;
+            .map(|p| (p.2, p.3, p.4))
+            .collect::<Vec<_>>();
         tx.send((sample_values, field_values))?;
     }
 
