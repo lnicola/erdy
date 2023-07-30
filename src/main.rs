@@ -102,12 +102,12 @@ impl<T: Send + 'static> ThreadedBlockReader<T> {
                 let band_count = dataset.raster_count() as usize;
 
                 for (x, y, data) in rx {
-                    let mut block_reducer = R::new(data);
+                    let mut block_reducer = R::new(band_count, data);
 
                     for band_index in 0..band_count {
                         let band = dataset.rasterband(band_index as isize + 1).unwrap();
                         let block = read_typed_block(&band, x, y).unwrap();
-                        block_reducer.push_block(band_index, block);
+                        block_reducer.push_block(band_index, band_count, block);
                     }
 
                     println!("{x} {y}");
@@ -146,8 +146,8 @@ trait BlockReducer {
     type InputState;
     type Output: Send + 'static;
 
-    fn new(input_state: Self::InputState) -> Self;
-    fn push_block(&mut self, band_index: usize, block: TypedBlock);
+    fn new(band_count: usize, input_state: Self::InputState) -> Self;
+    fn push_block(&mut self, band_index: usize, band_count: usize, block: TypedBlock);
     fn finalize(self) -> Self::Output;
 }
 
@@ -158,49 +158,41 @@ trait BlockFinalizer: Clone + Send + 'static {
 }
 
 struct SamplingBlockReducer {
-    band_count: usize,
     points: Vec<(usize, usize, f64, f64, Vec<Option<FieldValue>>)>,
     samples: Vec<BandValue>,
 }
 
 impl BlockReducer for SamplingBlockReducer {
-    type InputState = (
-        usize,
-        Vec<(usize, usize, f64, f64, Vec<Option<FieldValue>>)>,
-    );
+    type InputState = Vec<(usize, usize, f64, f64, Vec<Option<FieldValue>>)>;
     type Output = (
         Vec<BandValue>,
         Vec<(usize, usize, f64, f64, Vec<Option<FieldValue>>)>,
     );
 
-    fn new((band_count, points): Self::InputState) -> Self {
+    fn new(band_count: usize, points: Self::InputState) -> Self {
         let samples = vec![BandValue::I16(0); points.len() * band_count];
 
-        Self {
-            band_count,
-            points,
-            samples,
-        }
+        Self { points, samples }
     }
 
-    fn push_block(&mut self, band_index: usize, block: TypedBlock) {
+    fn push_block(&mut self, band_index: usize, band_count: usize, block: TypedBlock) {
         match block {
             TypedBlock::U16(buf) => {
                 for (idx, &(bx, by, ..)) in self.points.iter().enumerate() {
                     let pix = buf[(by, bx)];
-                    self.samples[self.band_count * idx + band_index] = BandValue::U16(pix);
+                    self.samples[band_count * idx + band_index] = BandValue::U16(pix);
                 }
             }
             TypedBlock::I16(buf) => {
                 for (idx, &(bx, by, ..)) in self.points.iter().enumerate() {
                     let pix = buf[(by, bx)];
-                    self.samples[self.band_count * idx + band_index] = BandValue::I16(pix);
+                    self.samples[band_count * idx + band_index] = BandValue::I16(pix);
                 }
             }
             TypedBlock::F32(buf) => {
                 for (idx, &(bx, by, ..)) in self.points.iter().enumerate() {
                     let pix = buf[(by, bx)];
-                    self.samples[self.band_count * idx + band_index] = BandValue::F32(pix);
+                    self.samples[band_count * idx + band_index] = BandValue::F32(pix);
                 }
             }
         }
@@ -362,7 +354,7 @@ fn main() -> Result<()> {
     let mut block_reader =
         ThreadedBlockReader::new::<SamplingBlockReducer, _>(PathBuf::from(&args[1]), block_sender);
     for ((block_x, block_y), points) in tile_points {
-        block_reader.submit(block_x, block_y, (band_count, points));
+        block_reader.submit(block_x, block_y, points);
     }
     drop(block_reader);
 
