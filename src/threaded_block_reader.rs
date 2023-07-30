@@ -57,7 +57,6 @@ impl<T: Send + 'static> ThreadedBlockReader<T> {
                         block_reducer.push_block(band_index, band_count, block);
                     }
 
-                    println!("{x} {y}");
                     block_finalizer.apply(block_reducer.finalize());
                 }
             });

@@ -38,7 +38,11 @@ pub struct SampleExtractionArgs {
     #[arg(short, long)]
     format: String,
 
-    // Number of threads to use
+    /// Output field names
+    #[arg(long, value_parser, num_args = 1..)]
+    fields: Option<Vec<String>>,
+
+    /// Number of threads to use
     #[arg(long)]
     num_threads: Option<usize>,
 }
@@ -141,17 +145,20 @@ impl SampleExtractionArgs {
         let geo_transform = image.geo_transform()?;
         let geo_transform = geo_transform.invert()?;
         let block_size = image.rasterband(1)?.block_size();
-        dbg!(block_size);
 
         let band_count = image.raster_count() as usize;
         for band_idx in 0..band_count {
             let band = image.rasterband(band_idx as isize + 1)?;
-            assert!(band.block_size() == block_size);
+            assert_eq!(band.block_size(), block_size);
         }
         let mut tile_points = HashMap::<_, Vec<_>>::new();
         let point_ds = Dataset::open(&self.points)?;
         let mut layer = point_ds.layer(0)?;
         let layer_name = layer.name();
+
+        if let Some(fields) = self.fields.as_ref() {
+            assert_eq!(fields.len(), band_count);
+        }
 
         dbg!(layer.feature_count());
         for feature in layer.features() {
@@ -181,12 +188,16 @@ impl SampleExtractionArgs {
             };
             output_fields.push(field_definition);
         }
-        for band_idx in 1..=band_count {
-            let band = image.rasterband(band_idx as isize)?;
-            let name = match band.description() {
-                Ok(name) if !name.is_empty() => name,
-                _ => format!("band_{band_idx}"),
+        for band_index in 1..=band_count {
+            let band = image.rasterband(band_index as isize)?;
+            let name = match self.fields.as_ref() {
+                Some(fields) => fields[band_index - 1].clone(),
+                None => match band.description() {
+                    Ok(name) if !name.is_empty() => name,
+                    _ => format!("band_{band_index}"),
+                },
             };
+
             let field_type = match band.band_type() {
                 GdalDataType::UInt16 => OGRFieldType::OFTInteger,
                 GdalDataType::Int16 => OGRFieldType::OFTInteger,
