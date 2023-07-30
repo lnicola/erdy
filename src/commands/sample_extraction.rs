@@ -284,12 +284,14 @@ impl SampleExtractionArgs {
 
             let block_sender = BlockSender(tx);
 
+            let num_threads = NonZeroUsize::new(self.num_threads.unwrap_or(8))
+                .unwrap()
+                .min(available_parallelism().unwrap_or(NonZeroUsize::new(1).unwrap()));
+            println!("Using {num_threads} threads");
             let mut block_reader = ThreadedBlockReader::new::<SamplingBlockReducer, _>(
                 PathBuf::from(&self.input),
                 block_sender,
-                NonZeroUsize::new(self.num_threads.unwrap_or(8))
-                    .unwrap()
-                    .min(available_parallelism().unwrap_or(NonZeroUsize::new(1).unwrap())),
+                num_threads,
             );
             for ((block_x, block_y), points) in tile_points {
                 block_reader.submit(block_x, block_y, points);
