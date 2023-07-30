@@ -238,6 +238,8 @@ fn main() -> Result<()> {
     let mut tile_points = HashMap::<_, Vec<_>>::new();
     let point_ds = Dataset::open(&args[2])?;
     let mut layer = point_ds.layer(0)?;
+    let layer_name = layer.name();
+
     dbg!(layer.feature_count());
     for feature in layer.features() {
         let (orig_x, orig_y, _) = feature.geometry().as_ref().unwrap().get_point(0);
@@ -295,7 +297,7 @@ fn main() -> Result<()> {
         let mut output =
             DriverManager::get_driver_by_name("SQLite")?.create_vector_only("output.sqlite")?;
         let output_layer = output.create_layer(LayerOptions {
-            name: "output",
+            name: &layer_name,
             srs: spatial_ref
                 .map(|wkt| SpatialRef::from_wkt(&wkt))
                 .transpose()?
