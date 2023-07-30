@@ -316,7 +316,6 @@ fn main() -> Result<()> {
             field_defn.add_to_layer(&output_layer)?;
         }
         for (sample_values, points) in rx {
-            println!("got {} points", points.len());
             let tx = output.start_transaction()?;
             let output_layer = tx.layer(0)?;
             for (idx, (_bx, _by, x, y, fields)) in points.into_iter().enumerate() {
@@ -358,7 +357,7 @@ fn main() -> Result<()> {
     let mut tile_points = tile_points.into_iter().collect::<Vec<_>>();
     tile_points.sort_by_key(|t| (t.0 .1, t.0 .0));
 
-    let block_sender = BlockSender(tx.clone());
+    let block_sender = BlockSender(tx);
 
     let mut block_reader =
         ThreadedBlockReader::new::<SamplingBlockReducer, _>(PathBuf::from(&args[1]), block_sender);
@@ -367,7 +366,6 @@ fn main() -> Result<()> {
     }
     drop(block_reader);
 
-    drop(tx);
     output_thread.join().unwrap()?;
 
     Ok(())
