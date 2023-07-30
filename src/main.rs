@@ -3,8 +3,8 @@ mod feature_ext;
 use std::{
     collections::HashMap,
     mem,
-    path::{Path, PathBuf},
-    sync::mpsc::{self, Receiver, Sender, SyncSender},
+    path::PathBuf,
+    sync::mpsc::{self, Sender, SyncSender},
     thread::{self, JoinHandle},
 };
 
@@ -78,51 +78,51 @@ fn read_typed_block<'d>(
 }
 
 struct ThreadedBlockReader<T> {
-    result_tx: SyncSender<(usize, usize, T, Vec<TypedBlock>)>,
     workers: Vec<JoinHandle<()>>,
     request_txs: Vec<Sender<(usize, usize, T)>>,
     current_worker: usize,
 }
 
 impl<T: Send + 'static> ThreadedBlockReader<T> {
-    fn new(path: PathBuf) -> (Self, Receiver<(usize, usize, T, Vec<TypedBlock>)>) {
-        let (tx, rx) = mpsc::sync_channel(4);
-        let num_threads = 4;
+    fn new<R: BlockReducer<InputState = T>, F: BlockFinalizer<Input = R::Output>>(
+        path: PathBuf,
+        block_finalizer: F,
+    ) -> Self {
+        let num_threads = 8;
+
         let mut workers = Vec::with_capacity(num_threads);
         let mut request_txs = Vec::with_capacity(num_threads);
         for _ in 0..num_threads {
-            let result_tx = tx.clone();
             let (tx, rx) = mpsc::channel();
             let path = path.clone();
+            let block_finalizer = block_finalizer.clone();
 
             let worker = thread::spawn(move || {
                 let dataset = Dataset::open(path).unwrap();
                 let band_count = dataset.raster_count() as usize;
 
                 for (x, y, data) in rx {
-                    let mut result = Vec::with_capacity(band_count);
-                    for idx in 0..band_count {
-                        let band = dataset.rasterband(idx as isize + 1).unwrap();
+                    let mut block_reducer = R::new(data);
+
+                    for band_index in 0..band_count {
+                        let band = dataset.rasterband(band_index as isize + 1).unwrap();
                         let block = read_typed_block(&band, x, y).unwrap();
-                        result.push(block);
+                        block_reducer.push_block(band_index, block);
                     }
 
-                    result_tx.send((x, y, data, result)).unwrap();
+                    println!("{x} {y}");
+                    block_finalizer.apply(block_reducer.finalize());
                 }
             });
             workers.push(worker);
             request_txs.push(tx);
         }
 
-        (
-            Self {
-                result_tx: tx,
-                workers,
-                request_txs,
-                current_worker: 0,
-            },
-            rx,
-        )
+        Self {
+            workers,
+            request_txs,
+            current_worker: 0,
+        }
     }
 
     fn submit(&mut self, x: usize, y: usize, data: T) {
@@ -134,15 +134,27 @@ impl<T: Send + 'static> ThreadedBlockReader<T> {
             self.current_worker = 0;
         }
     }
+
+    fn join(self) {
+        for worker in self.workers {
+            let _ = worker.join();
+        }
+    }
 }
 
 trait BlockReducer {
     type InputState;
-    type Output;
+    type Output: Send + 'static;
 
     fn new(input_state: Self::InputState) -> Self;
     fn push_block(&mut self, band_index: usize, block: TypedBlock);
     fn finalize(self) -> Self::Output;
+}
+
+trait BlockFinalizer: Clone + Send + 'static {
+    type Input: Send;
+
+    fn apply(&self, input: Self::Input);
 }
 
 struct SamplingBlockReducer {
@@ -196,6 +208,25 @@ impl BlockReducer for SamplingBlockReducer {
 
     fn finalize(self) -> Self::Output {
         (self.samples, self.points)
+    }
+}
+
+#[derive(Clone)]
+struct BlockSender(
+    SyncSender<(
+        Vec<BandValue>,
+        Vec<(usize, usize, f64, f64, Vec<Option<FieldValue>>)>,
+    )>,
+);
+
+impl BlockFinalizer for BlockSender {
+    type Input = (
+        Vec<BandValue>,
+        Vec<(usize, usize, f64, f64, Vec<Option<FieldValue>>)>,
+    );
+
+    fn apply(&self, input: Self::Input) {
+        self.0.send(input).unwrap()
     }
 }
 
@@ -270,7 +301,7 @@ fn main() -> Result<()> {
     )>(128);
     let output_thread = thread::spawn(move || {
         let mut output =
-            DriverManager::get_driver_by_name("GPKG")?.create_vector_only("output.gpkg")?;
+            DriverManager::get_driver_by_name("SQLite")?.create_vector_only("output.sqlite")?;
         let output_layer = output.create_layer(LayerOptions {
             name: "output",
             srs: spatial_ref
@@ -327,25 +358,16 @@ fn main() -> Result<()> {
     let mut tile_points = tile_points.into_iter().collect::<Vec<_>>();
     tile_points.sort_by_key(|t| (t.0 .1, t.0 .0));
 
-    let (mut block_reader, block_rx) = ThreadedBlockReader::new(PathBuf::from(&args[1]));
-    for ((block_x, block_y), points) in &tile_points {
-        block_reader.submit(*block_x, *block_y, points.clone());
+    let block_sender = BlockSender(tx.clone());
+
+    let mut block_reader =
+        ThreadedBlockReader::new::<SamplingBlockReducer, _>(PathBuf::from(&args[1]), block_sender);
+    for ((block_x, block_y), points) in tile_points {
+        block_reader.submit(block_x, block_y, (band_count, points));
     }
     drop(block_reader);
-    dbg!("reads submitted");
-
-    for (block_x, block_y, points, blocks) in block_rx {
-        println!("{block_x} {block_y}");
-        let mut block_reducer = SamplingBlockReducer::new((band_count, points));
-        for (band_idx, block) in blocks.into_iter().enumerate() {
-            block_reducer.push_block(band_idx, block);
-        }
-
-        tx.send(block_reducer.finalize())?;
-    }
 
     drop(tx);
-    dbg!("waiting for output thread");
     output_thread.join().unwrap()?;
 
     Ok(())
