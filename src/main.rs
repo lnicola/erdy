@@ -1,4 +1,4 @@
-mod feature_ext;
+mod gdal_ext;
 
 use std::{
     collections::HashMap,
@@ -10,16 +10,15 @@ use std::{
 
 use anyhow::Result;
 use gdal::{
-    raster::{GdalDataType, RasterBand},
+    raster::GdalDataType,
     spatial_ref::SpatialRef,
     vector::{
         Feature, FieldDefn, FieldValue, Geometry, LayerAccess, OGRFieldType, OGRwkbGeometryType,
     },
     Dataset, DriverManager, GeoTransformEx, LayerOptions, Metadata,
 };
-use ndarray::Array2;
 
-use crate::feature_ext::FeatureExt;
+use crate::gdal_ext::{FeatureExt, RasterBandExt, TypedBlock};
 
 #[derive(Clone, Copy)]
 enum BandValue {
@@ -45,35 +44,6 @@ impl FieldDefinition {
             field_defn.set_precision(precision);
         }
         Ok(field_defn)
-    }
-}
-
-#[derive(Debug)]
-enum TypedBlock {
-    U16(Array2<u16>),
-    I16(Array2<i16>),
-    F32(Array2<f32>),
-}
-
-fn read_typed_block<'d>(
-    band: &RasterBand<'d>,
-    x: usize,
-    y: usize,
-) -> gdal::errors::Result<TypedBlock> {
-    match band.band_type() {
-        GdalDataType::UInt16 => {
-            let buf = band.read_block::<u16>((x, y))?;
-            Ok(TypedBlock::U16(buf))
-        }
-        GdalDataType::Int16 => {
-            let buf = band.read_block::<i16>((x, y))?;
-            Ok(TypedBlock::I16(buf))
-        }
-        GdalDataType::Float32 => {
-            let buf = band.read_block::<f32>((x, y))?;
-            Ok(TypedBlock::F32(buf))
-        }
-        _ => unimplemented!(),
     }
 }
 
@@ -106,7 +76,7 @@ impl<T: Send + 'static> ThreadedBlockReader<T> {
 
                     for band_index in 0..band_count {
                         let band = dataset.rasterband(band_index as isize + 1).unwrap();
-                        let block = read_typed_block(&band, x, y).unwrap();
+                        let block = band.read_typed_block(x, y).unwrap();
                         block_reducer.push_block(band_index, band_count, block);
                     }
 
