@@ -15,6 +15,13 @@ use ndarray::Array2;
 
 use crate::feature_ext::FeatureExt;
 
+#[derive(Clone, Copy)]
+enum BandValue {
+    U16(u16),
+    I16(i16),
+    F32(f32),
+}
+
 struct FieldDefinition {
     name: String,
     field_type: OGRFieldType::Type,
@@ -129,10 +136,8 @@ fn main() -> Result<()> {
         output_fields.push(field_definition);
     }
 
-    let (tx, rx) = mpsc::sync_channel::<(
-        Vec<TypedBlock>,
-        Vec<(usize, usize, f64, f64, Vec<Option<FieldValue>>)>,
-    )>(128);
+    let (tx, rx) =
+        mpsc::sync_channel::<(Vec<BandValue>, Vec<(f64, f64, Vec<Option<FieldValue>>)>)>(128);
     let output_thread = thread::spawn(move || {
         let mut output =
             DriverManager::get_driver_by_name("GPKG")?.create_vector_only("output.gpkg")?;
@@ -149,50 +154,36 @@ fn main() -> Result<()> {
             let field_defn = field.to_field_defn()?;
             field_defn.add_to_layer(&output_layer)?;
         }
-        for (blocks, points) in rx {
+        for (sample_values, points) in rx {
             let tx = output.start_transaction()?;
             let output_layer = tx.layer(0)?;
-
-            let mut features = Vec::with_capacity(points.len());
-            for (_bx, _by, x, y, fields) in &points {
+            for (idx, (x, y, fields)) in points.into_iter().enumerate() {
                 let mut feature = Feature::new(output_layer.defn())?;
-                for (field_idx, field_value) in fields.iter().enumerate() {
+                let field_offset = fields.len();
+                for (field_idx, field_value) in fields.into_iter().enumerate() {
                     if let Some(field_value) = field_value {
                         feature.set_field_by_index(field_idx, &field_value);
                     }
                 }
-                let mut geometry = Geometry::empty(OGRwkbGeometryType::wkbPoint)?;
-                geometry.add_point_2d((*x, *y));
-                feature.set_geometry(geometry)?;
-                features.push(feature);
-            }
-
-            for (band_idx, block) in blocks.iter().enumerate() {
-                for ((bx, by, _x, _y, fields), feature) in points.iter().zip(&features) {
-                    let field_offset = fields.len();
-                    match block {
-                        TypedBlock::U16(buf) => {
-                            let value = buf[(*by, *bx)];
+                for band_idx in 0..band_count {
+                    match sample_values[band_count * idx + band_idx] {
+                        BandValue::U16(value) => {
                             feature
                                 .set_field_integer_by_index(band_idx + field_offset, value as i32);
                         }
-                        TypedBlock::I16(buf) => {
-                            let value = buf[(*by, *bx)];
+                        BandValue::I16(value) => {
                             feature
                                 .set_field_integer_by_index(band_idx + field_offset, value as i32);
                         }
-                        TypedBlock::F32(buf) => {
-                            let value = buf[(*by, *bx)];
+                        BandValue::F32(value) => {
                             feature
                                 .set_field_double_by_index(band_idx + field_offset, value as f64);
                         }
                     }
                 }
-            }
-
-            drop(blocks);
-
-            for feature in features {
+                let mut geometry = Geometry::empty(OGRwkbGeometryType::wkbPoint)?;
+                geometry.add_point_2d((x, y));
+                feature.set_geometry(geometry)?;
                 feature.create(&output_layer)?;
             }
             tx.commit()?;
@@ -205,13 +196,36 @@ fn main() -> Result<()> {
 
     for ((block_x, block_y), points) in tile_points {
         println!("{block_x} {block_y}");
-        let mut blocks = Vec::with_capacity(band_count);
+        let mut sample_values = vec![BandValue::I16(0); points.len() * band_count];
         for band_idx in 0..band_count {
             let band = image.rasterband(band_idx as isize + 1)?;
             let block = read_typed_block(&band, block_x, block_y)?;
-            blocks.push(block)
+            match block {
+                TypedBlock::U16(buf) => {
+                    for (idx, &(bx, by, ..)) in points.iter().enumerate() {
+                        let pix = buf[(by, bx)];
+                        sample_values[band_count * idx + band_idx] = BandValue::U16(pix);
+                    }
+                }
+                TypedBlock::I16(buf) => {
+                    for (idx, &(bx, by, ..)) in points.iter().enumerate() {
+                        let pix = buf[(by, bx)];
+                        sample_values[band_count * idx + band_idx] = BandValue::I16(pix);
+                    }
+                }
+                TypedBlock::F32(buf) => {
+                    for (idx, &(bx, by, ..)) in points.iter().enumerate() {
+                        let pix = buf[(by, bx)];
+                        sample_values[band_count * idx + band_idx] = BandValue::F32(pix);
+                    }
+                }
+            }
         }
-        tx.send((blocks, points))?;
+        let field_values = points
+            .into_iter()
+            .map(|p| (p.2, p.3, p.4))
+            .collect::<Vec<_>>();
+        tx.send((sample_values, field_values))?;
     }
 
     drop(tx);
