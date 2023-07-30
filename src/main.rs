@@ -1,6 +1,11 @@
 mod feature_ext;
 
-use std::{collections::HashMap, sync::mpsc, thread};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::mpsc::{self, Receiver, Sender, SyncSender},
+    thread::{self, JoinHandle},
+};
 
 use anyhow::Result;
 use gdal::{
@@ -68,6 +73,67 @@ fn read_typed_block<'d>(
             Ok(TypedBlock::F32(buf))
         }
         _ => unimplemented!(),
+    }
+}
+
+struct ThreadedBlockReader<T> {
+    path: PathBuf,
+    result_tx: SyncSender<(usize, usize, T, Vec<TypedBlock>)>,
+    workers: Vec<JoinHandle<()>>,
+    request_txs: Vec<Sender<(usize, usize, T)>>,
+    current_worker: usize,
+}
+
+impl<T: Send + 'static> ThreadedBlockReader<T> {
+    fn new(path: PathBuf) -> (Self, Receiver<(usize, usize, T, Vec<TypedBlock>)>) {
+        let (tx, rx) = mpsc::sync_channel(4);
+        let num_threads = 4;
+        let mut workers = Vec::with_capacity(num_threads);
+        let mut request_txs = Vec::with_capacity(num_threads);
+        for _ in 0..num_threads {
+            let result_tx = tx.clone();
+            let (tx, rx) = mpsc::channel();
+            let path = path.clone();
+
+            let worker = thread::spawn(move || {
+                let dataset = Dataset::open(path).unwrap();
+                let band_count = dataset.raster_count() as usize;
+
+                for (x, y, data) in rx {
+                    let mut result = Vec::with_capacity(band_count);
+                    for idx in 0..band_count {
+                        let band = dataset.rasterband(idx as isize + 1).unwrap();
+                        let block = read_typed_block(&band, x, y).unwrap();
+                        result.push(block);
+                    }
+
+                    result_tx.send((x, y, data, result)).unwrap();
+                }
+            });
+            workers.push(worker);
+            request_txs.push(tx);
+        }
+
+        (
+            Self {
+                path,
+                result_tx: tx,
+                workers,
+                request_txs,
+                current_worker: 0,
+            },
+            rx,
+        )
+    }
+
+    fn submit(&mut self, x: usize, y: usize, data: T) {
+        self.request_txs[self.current_worker]
+            .send((x, y, data))
+            .unwrap();
+        self.current_worker += 1;
+        if self.current_worker == self.request_txs.len() {
+            self.current_worker = 0;
+        }
     }
 }
 
@@ -194,12 +260,17 @@ fn main() -> Result<()> {
     let mut tile_points = tile_points.into_iter().collect::<Vec<_>>();
     tile_points.sort_by_key(|t| (t.0 .1, t.0 .0));
 
-    for ((block_x, block_y), points) in tile_points {
+    let (mut block_reader, block_rx) = ThreadedBlockReader::new(PathBuf::from(&args[1]));
+    for ((block_x, block_y), points) in &tile_points {
+        block_reader.submit(*block_x, *block_y, points.clone());
+    }
+    drop(block_reader);
+    dbg!("reads submitted");
+
+    for (block_x, block_y, points, blocks) in block_rx {
         println!("{block_x} {block_y}");
         let mut sample_values = vec![BandValue::I16(0); points.len() * band_count];
-        for band_idx in 0..band_count {
-            let band = image.rasterband(band_idx as isize + 1)?;
-            let block = read_typed_block(&band, block_x, block_y)?;
+        for (band_idx, block) in blocks.into_iter().enumerate() {
             match block {
                 TypedBlock::U16(buf) => {
                     for (idx, &(bx, by, ..)) in points.iter().enumerate() {
