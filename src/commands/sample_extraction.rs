@@ -1,9 +1,10 @@
 use std::{
     collections::HashMap,
     mem,
+    num::NonZeroUsize,
     path::PathBuf,
     sync::mpsc::{self, SyncSender},
-    thread,
+    thread::{self, available_parallelism},
 };
 
 use anyhow::Result;
@@ -36,6 +37,10 @@ pub struct SampleExtractionArgs {
     /// Output format
     #[arg(short, long)]
     format: String,
+
+    // Number of threads to use
+    #[arg(long)]
+    num_threads: Option<usize>,
 }
 
 #[derive(Clone, Copy)]
@@ -271,6 +276,9 @@ impl SampleExtractionArgs {
             let mut block_reader = ThreadedBlockReader::new::<SamplingBlockReducer, _>(
                 PathBuf::from(&self.input),
                 block_sender,
+                NonZeroUsize::new(self.num_threads.unwrap_or(8))
+                    .unwrap()
+                    .min(available_parallelism().unwrap_or(NonZeroUsize::new(1).unwrap())),
             );
             for ((block_x, block_y), points) in tile_points {
                 block_reader.submit(block_x, block_y, points);

@@ -1,4 +1,5 @@
 use std::{
+    num::NonZeroUsize,
     path::PathBuf,
     sync::mpsc::{self, Sender},
     thread::{self, JoinHandle},
@@ -24,7 +25,7 @@ pub trait BlockFinalizer: Clone + Send + 'static {
 }
 
 pub struct ThreadedBlockReader<T> {
-    workers: Vec<JoinHandle<()>>,
+    _workers: Vec<JoinHandle<()>>,
     request_txs: Vec<Sender<(usize, usize, T)>>,
     current_worker: usize,
 }
@@ -33,9 +34,9 @@ impl<T: Send + 'static> ThreadedBlockReader<T> {
     pub fn new<R: BlockReducer<InputState = T>, F: BlockFinalizer<Input = R::Output>>(
         path: PathBuf,
         block_finalizer: F,
+        num_threads: NonZeroUsize,
     ) -> Self {
-        let num_threads = 8;
-
+        let num_threads = num_threads.into();
         let mut workers = Vec::with_capacity(num_threads);
         let mut request_txs = Vec::with_capacity(num_threads);
         for _ in 0..num_threads {
@@ -65,7 +66,7 @@ impl<T: Send + 'static> ThreadedBlockReader<T> {
         }
 
         Self {
-            workers,
+            _workers: workers,
             request_txs,
             current_worker: 0,
         }
@@ -78,12 +79,6 @@ impl<T: Send + 'static> ThreadedBlockReader<T> {
         self.current_worker += 1;
         if self.current_worker == self.request_txs.len() {
             self.current_worker = 0;
-        }
-    }
-
-    pub fn join(self) {
-        for worker in self.workers {
-            let _ = worker.join();
         }
     }
 }
