@@ -2,6 +2,7 @@ mod feature_ext;
 
 use std::{
     collections::HashMap,
+    mem,
     path::{Path, PathBuf},
     sync::mpsc::{self, Receiver, Sender, SyncSender},
     thread::{self, JoinHandle},
@@ -77,7 +78,6 @@ fn read_typed_block<'d>(
 }
 
 struct ThreadedBlockReader<T> {
-    path: PathBuf,
     result_tx: SyncSender<(usize, usize, T, Vec<TypedBlock>)>,
     workers: Vec<JoinHandle<()>>,
     request_txs: Vec<Sender<(usize, usize, T)>>,
@@ -116,7 +116,6 @@ impl<T: Send + 'static> ThreadedBlockReader<T> {
 
         (
             Self {
-                path,
                 result_tx: tx,
                 workers,
                 request_txs,
@@ -134,6 +133,69 @@ impl<T: Send + 'static> ThreadedBlockReader<T> {
         if self.current_worker == self.request_txs.len() {
             self.current_worker = 0;
         }
+    }
+}
+
+trait BlockReducer {
+    type InputState;
+    type Output;
+
+    fn new(input_state: Self::InputState) -> Self;
+    fn push_block(&mut self, band_index: usize, block: TypedBlock);
+    fn finalize(self) -> Self::Output;
+}
+
+struct SamplingBlockReducer {
+    band_count: usize,
+    points: Vec<(usize, usize, f64, f64, Vec<Option<FieldValue>>)>,
+    samples: Vec<BandValue>,
+}
+
+impl BlockReducer for SamplingBlockReducer {
+    type InputState = (
+        usize,
+        Vec<(usize, usize, f64, f64, Vec<Option<FieldValue>>)>,
+    );
+    type Output = (
+        Vec<BandValue>,
+        Vec<(usize, usize, f64, f64, Vec<Option<FieldValue>>)>,
+    );
+
+    fn new((band_count, points): Self::InputState) -> Self {
+        let samples = vec![BandValue::I16(0); points.len() * band_count];
+
+        Self {
+            band_count,
+            points,
+            samples,
+        }
+    }
+
+    fn push_block(&mut self, band_index: usize, block: TypedBlock) {
+        match block {
+            TypedBlock::U16(buf) => {
+                for (idx, &(bx, by, ..)) in self.points.iter().enumerate() {
+                    let pix = buf[(by, bx)];
+                    self.samples[self.band_count * idx + band_index] = BandValue::U16(pix);
+                }
+            }
+            TypedBlock::I16(buf) => {
+                for (idx, &(bx, by, ..)) in self.points.iter().enumerate() {
+                    let pix = buf[(by, bx)];
+                    self.samples[self.band_count * idx + band_index] = BandValue::I16(pix);
+                }
+            }
+            TypedBlock::F32(buf) => {
+                for (idx, &(bx, by, ..)) in self.points.iter().enumerate() {
+                    let pix = buf[(by, bx)];
+                    self.samples[self.band_count * idx + band_index] = BandValue::F32(pix);
+                }
+            }
+        }
+    }
+
+    fn finalize(self) -> Self::Output {
+        (self.samples, self.points)
     }
 }
 
@@ -221,6 +283,7 @@ fn main() -> Result<()> {
             field_defn.add_to_layer(&output_layer)?;
         }
         for (sample_values, points) in rx {
+            println!("got {} points", points.len());
             let tx = output.start_transaction()?;
             let output_layer = tx.layer(0)?;
             for (idx, (x, y, fields)) in points.into_iter().enumerate() {
@@ -254,6 +317,8 @@ fn main() -> Result<()> {
             }
             tx.commit()?;
         }
+        output.close()?;
+        mem::forget(output);
         Ok::<_, gdal::errors::GdalError>(())
     });
 
@@ -269,29 +334,12 @@ fn main() -> Result<()> {
 
     for (block_x, block_y, points, blocks) in block_rx {
         println!("{block_x} {block_y}");
-        let mut sample_values = vec![BandValue::I16(0); points.len() * band_count];
+        let mut block_reducer = SamplingBlockReducer::new((band_count, points));
         for (band_idx, block) in blocks.into_iter().enumerate() {
-            match block {
-                TypedBlock::U16(buf) => {
-                    for (idx, &(bx, by, ..)) in points.iter().enumerate() {
-                        let pix = buf[(by, bx)];
-                        sample_values[band_count * idx + band_idx] = BandValue::U16(pix);
-                    }
-                }
-                TypedBlock::I16(buf) => {
-                    for (idx, &(bx, by, ..)) in points.iter().enumerate() {
-                        let pix = buf[(by, bx)];
-                        sample_values[band_count * idx + band_idx] = BandValue::I16(pix);
-                    }
-                }
-                TypedBlock::F32(buf) => {
-                    for (idx, &(bx, by, ..)) in points.iter().enumerate() {
-                        let pix = buf[(by, bx)];
-                        sample_values[band_count * idx + band_idx] = BandValue::F32(pix);
-                    }
-                }
-            }
+            block_reducer.push_block(band_idx, block);
         }
+
+        let (sample_values, points) = block_reducer.finalize();
         let field_values = points
             .into_iter()
             .map(|p| (p.2, p.3, p.4))
@@ -300,6 +348,7 @@ fn main() -> Result<()> {
     }
 
     drop(tx);
+    dbg!("waiting for output thread");
     output_thread.join().unwrap()?;
 
     Ok(())
