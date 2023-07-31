@@ -2,8 +2,12 @@ use std::{
     collections::HashMap,
     mem,
     num::NonZeroUsize,
+    ops::Range,
     path::PathBuf,
-    sync::mpsc::{self, SyncSender},
+    sync::{
+        mpsc::{self, SyncSender},
+        Arc,
+    },
     thread::{self, available_parallelism},
 };
 
@@ -124,32 +128,34 @@ impl BlockReducer for SamplingBlockReducer {
 }
 
 #[derive(Clone)]
-struct BlockSender(Vec<SyncSender<(Vec<BandValue>, BlockPoints)>>);
+struct BlockSender(Vec<SyncSender<(Arc<(Vec<BandValue>, BlockPoints)>, Range<usize>)>>);
 
 impl BlockFinalizer for BlockSender {
     type Input = (Vec<BandValue>, BlockPoints);
 
     fn apply(&self, input: Self::Input) {
-        let band_count = input.0.len() / input.1.points.len();
-        let mut layers = HashMap::<_, (Vec<BandValue>, BlockPoints)>::new();
-        for (idx, point) in input.1.points.into_iter().enumerate() {
-            {
-                let entry = layers.entry(point.input_index).or_default();
-                entry
-                    .0
-                    .extend_from_slice(&input.0[idx * band_count..(idx + 1) * band_count]);
-                entry.1.points.push(point);
-            }
-        }
-
-        for (input_idx, data) in layers {
-            self.0[input_idx].send(data).unwrap()
+        let input = Arc::new(input);
+        for (idx, (&input_index, &start)) in input
+            .1
+            .input_indexes
+            .iter()
+            .zip(&input.1.input_start_positions)
+            .enumerate()
+        {
+            let end = input
+                .1
+                .input_start_positions
+                .get(idx + 1)
+                .copied()
+                .unwrap_or(input.1.points.len());
+            self.0[input_index]
+                .send((input.clone(), start..end))
+                .unwrap()
         }
     }
 }
 
 struct SamplingPoint {
-    input_index: usize,
     _fid: Option<u64>,
     bx: usize,
     by: usize,
@@ -232,7 +238,6 @@ impl SampleExtractionArgs {
                     );
                     let (x, y) = (x as usize, y as usize);
                     let sampling_point = SamplingPoint {
-                        input_index,
                         _fid: feature.fid(),
                         bx: x % block_size.0,
                         by: y % block_size.1,
@@ -280,7 +285,8 @@ impl SampleExtractionArgs {
                 .zip(output_fields)
                 .map(|(((a, b), c), d)| (a, b, c, d))
             {
-                let (tx, rx) = mpsc::sync_channel::<(Vec<BandValue>, BlockPoints)>(128);
+                let (tx, rx) =
+                    mpsc::sync_channel::<(Arc<(Vec<BandValue>, BlockPoints)>, Range<usize>)>(128);
                 output_txs.push(tx);
 
                 let thread = scope.spawn(move || {
@@ -299,24 +305,25 @@ impl SampleExtractionArgs {
                         let field_defn = field.to_field_defn()?;
                         field_defn.add_to_layer(&output_layer)?;
                     }
-                    for (sample_values, block_points) in rx {
+                    for (data, range) in rx {
+                        let (sample_values, block_points) = &*data;
                         let tx = output.start_transaction()?;
                         let output_layer = tx.layer(0)?;
-                        for (idx, point) in block_points.points.into_iter().enumerate() {
+                        for (idx, point) in block_points.points[range.clone()].iter().enumerate() {
+                            let sample_idx = idx + range.start;
                             let mut feature = Feature::new(output_layer.defn())?;
                             // this is too slow, don't do it by default
                             #[cfg(FALSE)]
                             feature.set_fid(point._fid)?;
                             let field_offset = point.original_fields.len();
-                            for (field_idx, field_value) in
-                                point.original_fields.into_iter().enumerate()
+                            for (field_idx, field_value) in point.original_fields.iter().enumerate()
                             {
                                 if let Some(field_value) = field_value {
-                                    feature.set_field_by_index(field_idx, &field_value);
+                                    feature.set_field_by_index(field_idx, field_value);
                                 }
                             }
                             for band_idx in 0..band_count {
-                                match sample_values[band_count * idx + band_idx] {
+                                match sample_values[band_count * sample_idx + band_idx] {
                                     BandValue::U16(value) => {
                                         feature.set_field_integer_by_index(
                                             band_idx + field_offset,
