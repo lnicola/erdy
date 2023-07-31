@@ -161,6 +161,8 @@ struct SamplingPoint {
 #[derive(Default)]
 struct BlockPoints {
     points: Vec<SamplingPoint>,
+    input_indexes: Vec<usize>,
+    input_start_positions: Vec<usize>,
 }
 
 impl SampleExtractionArgs {
@@ -212,7 +214,7 @@ impl SampleExtractionArgs {
         let mut layer_names = Vec::with_capacity(self.points.len());
         let mut spatial_refs = Vec::with_capacity(self.points.len());
         let mut output_fields = Vec::with_capacity(self.points.len());
-        for (idx, path) in self.points.iter().enumerate() {
+        for (input_index, path) in self.points.iter().enumerate() {
             let ds = Dataset::open(path)?;
             let mut layer = ds.layer(0)?;
 
@@ -230,7 +232,7 @@ impl SampleExtractionArgs {
                     );
                     let (x, y) = (x as usize, y as usize);
                     let sampling_point = SamplingPoint {
-                        input_index: idx,
+                        input_index,
                         _fid: feature.fid(),
                         bx: x % block_size.0,
                         by: y % block_size.1,
@@ -238,11 +240,14 @@ impl SampleExtractionArgs {
                         orig_y,
                         original_fields: feature.fields().map(|f| f.1).collect::<Vec<_>>(),
                     };
-                    tile_points
-                        .entry((block_x, block_y))
-                        .or_default()
-                        .points
-                        .push(sampling_point);
+                    let block_points = tile_points.entry((block_x, block_y)).or_default();
+                    if block_points.input_indexes.last().copied() != Some(input_index) {
+                        block_points.input_indexes.push(input_index);
+                        block_points
+                            .input_start_positions
+                            .push(block_points.points.len());
+                    }
+                    block_points.points.push(sampling_point);
                 }
             }
 
