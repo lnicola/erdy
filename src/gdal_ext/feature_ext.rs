@@ -1,8 +1,13 @@
 use std::ffi::{c_double, c_int, c_longlong};
 
-use gdal::vector::{Feature, FieldValue};
+use gdal::{
+    errors::GdalError,
+    vector::{Feature, FieldValue},
+};
+use gdal_sys::OGRErr;
 
 pub trait FeatureExt {
+    fn set_fid(&self, fid: Option<u64>) -> gdal::errors::Result<()>;
     fn set_field_double_by_index(&self, idx: usize, value: f64);
     fn set_field_integer_by_index(&self, idx: usize, value: i32);
     fn set_field_integer64_by_index(&self, idx: usize, value: i64);
@@ -10,6 +15,21 @@ pub trait FeatureExt {
 }
 
 impl FeatureExt for Feature<'_> {
+    fn set_fid(&self, fid: Option<u64>) -> gdal::errors::Result<()> {
+        let rv = unsafe {
+            gdal_sys::OGR_F_SetFID(self.c_feature(), fid.map(|fid| fid as i64).unwrap_or(-1))
+        };
+
+        if rv != OGRErr::OGRERR_NONE {
+            return Err(GdalError::OgrError {
+                err: OGRErr::OGRERR_FAILURE,
+                method_name: "OGR_F_SetFID",
+            });
+        }
+
+        Ok(())
+    }
+
     fn set_field_double_by_index(&self, idx: usize, value: f64) {
         unsafe {
             gdal_sys::OGR_F_SetFieldDouble(self.c_feature(), idx as i32, value as c_double);

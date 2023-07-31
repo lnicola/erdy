@@ -75,16 +75,13 @@ impl FieldDefinition {
 }
 
 struct SamplingBlockReducer {
-    points: Vec<(usize, usize, f64, f64, Vec<Option<FieldValue>>)>,
+    points: Vec<SamplingPoint>,
     samples: Vec<BandValue>,
 }
 
 impl BlockReducer for SamplingBlockReducer {
-    type InputState = Vec<(usize, usize, f64, f64, Vec<Option<FieldValue>>)>;
-    type Output = (
-        Vec<BandValue>,
-        Vec<(usize, usize, f64, f64, Vec<Option<FieldValue>>)>,
-    );
+    type InputState = Vec<SamplingPoint>;
+    type Output = (Vec<BandValue>, Vec<SamplingPoint>);
 
     fn new(band_count: usize, points: Self::InputState) -> Self {
         let samples = vec![BandValue::I16(0); points.len() * band_count];
@@ -95,20 +92,20 @@ impl BlockReducer for SamplingBlockReducer {
     fn push_block(&mut self, band_index: usize, band_count: usize, block: TypedBlock) {
         match block {
             TypedBlock::U16(buf) => {
-                for (idx, &(bx, by, ..)) in self.points.iter().enumerate() {
-                    let pix = buf[(by, bx)];
+                for (idx, point) in self.points.iter().enumerate() {
+                    let pix = buf[(point.by, point.bx)];
                     self.samples[band_count * idx + band_index] = BandValue::U16(pix);
                 }
             }
             TypedBlock::I16(buf) => {
-                for (idx, &(bx, by, ..)) in self.points.iter().enumerate() {
-                    let pix = buf[(by, bx)];
+                for (idx, point) in self.points.iter().enumerate() {
+                    let pix = buf[(point.by, point.bx)];
                     self.samples[band_count * idx + band_index] = BandValue::I16(pix);
                 }
             }
             TypedBlock::F32(buf) => {
-                for (idx, &(bx, by, ..)) in self.points.iter().enumerate() {
-                    let pix = buf[(by, bx)];
+                for (idx, point) in self.points.iter().enumerate() {
+                    let pix = buf[(point.by, point.bx)];
                     self.samples[band_count * idx + band_index] = BandValue::F32(pix);
                 }
             }
@@ -121,22 +118,23 @@ impl BlockReducer for SamplingBlockReducer {
 }
 
 #[derive(Clone)]
-struct BlockSender(
-    SyncSender<(
-        Vec<BandValue>,
-        Vec<(usize, usize, f64, f64, Vec<Option<FieldValue>>)>,
-    )>,
-);
+struct BlockSender(SyncSender<(Vec<BandValue>, Vec<SamplingPoint>)>);
 
 impl BlockFinalizer for BlockSender {
-    type Input = (
-        Vec<BandValue>,
-        Vec<(usize, usize, f64, f64, Vec<Option<FieldValue>>)>,
-    );
+    type Input = (Vec<BandValue>, Vec<SamplingPoint>);
 
     fn apply(&self, input: Self::Input) {
         self.0.send(input).unwrap()
     }
+}
+
+struct SamplingPoint {
+    _fid: Option<u64>,
+    bx: usize,
+    by: usize,
+    orig_x: f64,
+    orig_y: f64,
+    original_fields: Vec<Option<FieldValue>>,
 }
 
 impl SampleExtractionArgs {
@@ -169,13 +167,18 @@ impl SampleExtractionArgs {
                 (y / block_size.1 as f64) as usize,
             );
             let (x, y) = (x as usize, y as usize);
-            tile_points.entry((block_x, block_y)).or_default().push((
-                x % block_size.0,
-                y % block_size.1,
+            let sampling_point = SamplingPoint {
+                _fid: feature.fid(),
+                bx: x % block_size.0,
+                by: y % block_size.1,
                 orig_x,
                 orig_y,
-                feature.fields().map(|f| f.1).collect::<Vec<_>>(),
-            ));
+                original_fields: feature.fields().map(|f| f.1).collect::<Vec<_>>(),
+            };
+            tile_points
+                .entry((block_x, block_y))
+                .or_default()
+                .push(sampling_point);
         }
         let spatial_ref = layer.spatial_ref().map(|sr| sr.to_wkt()).transpose()?;
         let mut output_fields = Vec::new();
@@ -213,10 +216,7 @@ impl SampleExtractionArgs {
             output_fields.push(field_definition);
         }
 
-        let (tx, rx) = mpsc::sync_channel::<(
-            Vec<BandValue>,
-            Vec<(usize, usize, f64, f64, Vec<Option<FieldValue>>)>,
-        )>(128);
+        let (tx, rx) = mpsc::sync_channel::<(Vec<BandValue>, Vec<SamplingPoint>)>(128);
         thread::scope(|scope| -> Result<()> {
             let output_thread = scope.spawn(move || {
                 let mut output = DriverManager::get_driver_by_name(&self.format)?
@@ -234,13 +234,18 @@ impl SampleExtractionArgs {
                     let field_defn = field.to_field_defn()?;
                     field_defn.add_to_layer(&output_layer)?;
                 }
-                for (sample_values, points) in rx {
+                for (sample_values, mut points) in rx {
                     let tx = output.start_transaction()?;
                     let output_layer = tx.layer(0)?;
-                    for (idx, (_bx, _by, x, y, fields)) in points.into_iter().enumerate() {
+                    points.sort_by_key(|p| p._fid);
+                    for (idx, point) in points.into_iter().enumerate() {
                         let mut feature = Feature::new(output_layer.defn())?;
-                        let field_offset = fields.len();
-                        for (field_idx, field_value) in fields.into_iter().enumerate() {
+                        // this is too slow, don't do it by default
+                        // feature.set_fid(point._fid)?;
+                        let field_offset = point.original_fields.len();
+                        for (field_idx, field_value) in
+                            point.original_fields.into_iter().enumerate()
+                        {
                             if let Some(field_value) = field_value {
                                 feature.set_field_by_index(field_idx, &field_value);
                             }
@@ -268,7 +273,7 @@ impl SampleExtractionArgs {
                             }
                         }
                         let mut geometry = Geometry::empty(OGRwkbGeometryType::wkbPoint)?;
-                        geometry.add_point_2d((x, y));
+                        geometry.add_point_2d((point.orig_x, point.orig_y));
                         feature.set_geometry(geometry)?;
                         feature.create(&output_layer)?;
                     }
