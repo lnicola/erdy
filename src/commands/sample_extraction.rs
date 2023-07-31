@@ -51,6 +51,10 @@ pub struct SampleExtractionArgs {
     /// Number of threads to use
     #[arg(long)]
     num_threads: Option<usize>,
+
+    /// Copy the input feature ids
+    #[arg(long, default_value_t)]
+    copy_fid: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -312,9 +316,9 @@ impl SampleExtractionArgs {
                         for (idx, point) in block_points.points[range.clone()].iter().enumerate() {
                             let sample_idx = idx + range.start;
                             let mut feature = Feature::new(output_layer.defn())?;
-                            // this is too slow, don't do it by default
-                            #[cfg(FALSE)]
-                            feature.set_fid(point._fid)?;
+                            if self.copy_fid {
+                                feature.set_fid(point._fid)?;
+                            }
                             let field_offset = point.original_fields.len();
                             for (field_idx, field_value) in point.original_fields.iter().enumerate()
                             {
