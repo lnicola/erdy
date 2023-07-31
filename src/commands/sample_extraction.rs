@@ -78,36 +78,39 @@ impl FieldDefinition {
 }
 
 struct SamplingBlockReducer {
-    points: Vec<SamplingPoint>,
+    block_points: BlockPoints,
     samples: Vec<BandValue>,
 }
 
 impl BlockReducer for SamplingBlockReducer {
-    type InputState = Vec<SamplingPoint>;
-    type Output = (Vec<BandValue>, Vec<SamplingPoint>);
+    type InputState = BlockPoints;
+    type Output = (Vec<BandValue>, BlockPoints);
 
-    fn new(band_count: usize, points: Self::InputState) -> Self {
-        let samples = vec![BandValue::I16(0); points.len() * band_count];
+    fn new(band_count: usize, block_points: Self::InputState) -> Self {
+        let samples = vec![BandValue::I16(0); block_points.points.len() * band_count];
 
-        Self { points, samples }
+        Self {
+            block_points,
+            samples,
+        }
     }
 
     fn push_block(&mut self, band_index: usize, band_count: usize, block: TypedBlock) {
         match block {
             TypedBlock::U16(buf) => {
-                for (idx, point) in self.points.iter().enumerate() {
+                for (idx, point) in self.block_points.points.iter().enumerate() {
                     let pix = buf[(point.by, point.bx)];
                     self.samples[band_count * idx + band_index] = BandValue::U16(pix);
                 }
             }
             TypedBlock::I16(buf) => {
-                for (idx, point) in self.points.iter().enumerate() {
+                for (idx, point) in self.block_points.points.iter().enumerate() {
                     let pix = buf[(point.by, point.bx)];
                     self.samples[band_count * idx + band_index] = BandValue::I16(pix);
                 }
             }
             TypedBlock::F32(buf) => {
-                for (idx, point) in self.points.iter().enumerate() {
+                for (idx, point) in self.block_points.points.iter().enumerate() {
                     let pix = buf[(point.by, point.bx)];
                     self.samples[band_count * idx + band_index] = BandValue::F32(pix);
                 }
@@ -116,26 +119,26 @@ impl BlockReducer for SamplingBlockReducer {
     }
 
     fn finalize(self) -> Self::Output {
-        (self.samples, self.points)
+        (self.samples, self.block_points)
     }
 }
 
 #[derive(Clone)]
-struct BlockSender(Vec<SyncSender<(Vec<BandValue>, Vec<SamplingPoint>)>>);
+struct BlockSender(Vec<SyncSender<(Vec<BandValue>, BlockPoints)>>);
 
 impl BlockFinalizer for BlockSender {
-    type Input = (Vec<BandValue>, Vec<SamplingPoint>);
+    type Input = (Vec<BandValue>, BlockPoints);
 
     fn apply(&self, input: Self::Input) {
-        let band_count = input.0.len() / input.1.len();
-        let mut layers = HashMap::<_, (Vec<BandValue>, Vec<SamplingPoint>)>::new();
-        for (idx, point) in input.1.into_iter().enumerate() {
+        let band_count = input.0.len() / input.1.points.len();
+        let mut layers = HashMap::<_, (Vec<BandValue>, BlockPoints)>::new();
+        for (idx, point) in input.1.points.into_iter().enumerate() {
             {
                 let entry = layers.entry(point.input_index).or_default();
                 entry
                     .0
                     .extend_from_slice(&input.0[idx * band_count..(idx + 1) * band_count]);
-                entry.1.push(point);
+                entry.1.points.push(point);
             }
         }
 
@@ -153,6 +156,11 @@ struct SamplingPoint {
     orig_x: f64,
     orig_y: f64,
     original_fields: Vec<Option<FieldValue>>,
+}
+
+#[derive(Default)]
+struct BlockPoints {
+    points: Vec<SamplingPoint>,
 }
 
 impl SampleExtractionArgs {
@@ -200,7 +208,7 @@ impl SampleExtractionArgs {
             band_fields.push(field_definition);
         }
 
-        let mut tile_points = HashMap::<_, Vec<_>>::new();
+        let mut tile_points = HashMap::<_, BlockPoints>::new();
         let mut layer_names = Vec::with_capacity(self.points.len());
         let mut spatial_refs = Vec::with_capacity(self.points.len());
         let mut output_fields = Vec::with_capacity(self.points.len());
@@ -232,6 +240,7 @@ impl SampleExtractionArgs {
                 tile_points
                     .entry((block_x, block_y))
                     .or_default()
+                    .points
                     .push(sampling_point);
             }
 
@@ -264,7 +273,7 @@ impl SampleExtractionArgs {
                 .zip(output_fields)
                 .map(|(((a, b), c), d)| (a, b, c, d))
             {
-                let (tx, rx) = mpsc::sync_channel::<(Vec<BandValue>, Vec<SamplingPoint>)>(128);
+                let (tx, rx) = mpsc::sync_channel::<(Vec<BandValue>, BlockPoints)>(128);
                 output_txs.push(tx);
 
                 let thread = scope.spawn(move || {
@@ -283,11 +292,10 @@ impl SampleExtractionArgs {
                         let field_defn = field.to_field_defn()?;
                         field_defn.add_to_layer(&output_layer)?;
                     }
-                    for (sample_values, mut points) in rx {
+                    for (sample_values, block_points) in rx {
                         let tx = output.start_transaction()?;
                         let output_layer = tx.layer(0)?;
-                        points.sort_by_key(|p| p._fid);
-                        for (idx, point) in points.into_iter().enumerate() {
+                        for (idx, point) in block_points.points.into_iter().enumerate() {
                             let mut feature = Feature::new(output_layer.defn())?;
                             // this is too slow, don't do it by default
                             #[cfg(FALSE)]
