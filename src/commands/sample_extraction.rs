@@ -221,27 +221,29 @@ impl SampleExtractionArgs {
 
             dbg!(layer.feature_count());
             for feature in layer.features() {
-                let (orig_x, orig_y, _) = feature.geometry().as_ref().unwrap().get_point(0);
-                let (x, y) = geo_transform.apply(orig_x, orig_y);
-                let (block_x, block_y) = (
-                    (x / block_size.0 as f64) as usize,
-                    (y / block_size.1 as f64) as usize,
-                );
-                let (x, y) = (x as usize, y as usize);
-                let sampling_point = SamplingPoint {
-                    input_index: idx,
-                    _fid: feature.fid(),
-                    bx: x % block_size.0,
-                    by: y % block_size.1,
-                    orig_x,
-                    orig_y,
-                    original_fields: feature.fields().map(|f| f.1).collect::<Vec<_>>(),
-                };
-                tile_points
-                    .entry((block_x, block_y))
-                    .or_default()
-                    .points
-                    .push(sampling_point);
+                if let Some(geometry) = feature.geometry().as_ref() {
+                    let (orig_x, orig_y, _) = geometry.get_point(0);
+                    let (x, y) = geo_transform.apply(orig_x, orig_y);
+                    let (block_x, block_y) = (
+                        (x / block_size.0 as f64) as usize,
+                        (y / block_size.1 as f64) as usize,
+                    );
+                    let (x, y) = (x as usize, y as usize);
+                    let sampling_point = SamplingPoint {
+                        input_index: idx,
+                        _fid: feature.fid(),
+                        bx: x % block_size.0,
+                        by: y % block_size.1,
+                        orig_x,
+                        orig_y,
+                        original_fields: feature.fields().map(|f| f.1).collect::<Vec<_>>(),
+                    };
+                    tile_points
+                        .entry((block_x, block_y))
+                        .or_default()
+                        .points
+                        .push(sampling_point);
+                }
             }
 
             let spatial_ref = layer.spatial_ref().map(|sr| sr.to_wkt()).transpose()?;
