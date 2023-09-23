@@ -7,8 +7,8 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 anyhow = "1.0"
-clap = { version = "4.3", features = ["derive"] }
-gdal = { version = "0.15", features = ["array"] }
+clap = { version = "4.4", features = ["derive"] }
+gdal = { version = "0.16", features = ["array"] }
 gdal-sys = "0.9"
 ndarray = "0.15"
 

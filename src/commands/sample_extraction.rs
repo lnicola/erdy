@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    mem,
     num::NonZeroUsize,
     ops::Range,
     path::PathBuf,
@@ -356,7 +355,6 @@ impl SampleExtractionArgs {
                         tx.commit()?;
                     }
                     output.close()?;
-                    mem::forget(output);
                     Ok::<_, gdal::errors::GdalError>(())
                 });
                 output_threads.push(thread);
