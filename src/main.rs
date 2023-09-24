@@ -18,6 +18,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     match args.command {
+        Command::BatchTranslate(args) => args.run(),
         Command::SampleExtraction(args) => args.run(),
     }
 }
