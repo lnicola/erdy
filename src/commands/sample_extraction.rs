@@ -334,30 +334,23 @@ impl SampleExtractionArgs {
                                 }
                             }
                             for band_idx in 0..band_count {
+                                let field_index = field_offset + band_idx;
                                 match sample_values[band_count * sample_idx + band_idx] {
                                     BandValue::U8(value) => {
-                                        feature.set_field_integer_by_index(
-                                            band_idx + field_offset,
-                                            value as i32,
-                                        );
+                                        feature
+                                            .set_field_integer_by_index(field_index, value as i32);
                                     }
                                     BandValue::U16(value) => {
-                                        feature.set_field_integer_by_index(
-                                            band_idx + field_offset,
-                                            value as i32,
-                                        );
+                                        feature
+                                            .set_field_integer_by_index(field_index, value as i32);
                                     }
                                     BandValue::I16(value) => {
-                                        feature.set_field_integer_by_index(
-                                            band_idx + field_offset,
-                                            value as i32,
-                                        );
+                                        feature
+                                            .set_field_integer_by_index(field_index, value as i32);
                                     }
                                     BandValue::F32(value) => {
-                                        feature.set_field_double_by_index(
-                                            band_idx + field_offset,
-                                            value as f64,
-                                        );
+                                        feature
+                                            .set_field_double_by_index(field_index, value as f64);
                                     }
                                 }
                             }
