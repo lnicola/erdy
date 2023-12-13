@@ -72,7 +72,7 @@ impl BatchTranslateArgs {
                             ptr::null_mut(),
                         )
                     };
-                    if rv != ptr::null_mut() {
+                    if !rv.is_null() {
                         bar_.inc_length(1);
 
                         let output = entry.path().with_extension("tif");
@@ -88,7 +88,7 @@ impl BatchTranslateArgs {
                                 &mut err,
                             )
                         };
-                        if ds_ptr != ptr::null_mut() {
+                        if !ds_ptr.is_null() {
                             unsafe { gdal_sys::GDALClose(ds_ptr) };
                         } else {
                             dbg!(entry.path());
