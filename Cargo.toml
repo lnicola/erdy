@@ -8,6 +8,8 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.4", features = ["derive"] }
+# gdal = { version = "0.16", features = ["array"] }
+# gdal-sys = "0.9"
 gdal = { version = "0.16", git = "https://github.com/georust/gdal", features = ["array"] }
 gdal-sys = { version = "0.9", git = "https://github.com/georust/gdal" }
 indicatif = "0.17.7"
@@ -16,3 +18,6 @@ tempfile = "3.8.1"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 walkdir = "2.4.0"
+
+[profile.release]
+debug = 2

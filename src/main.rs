@@ -21,6 +21,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     match args.command {
+        Command::BandSelect(args) => args.run(),
         Command::BatchTranslate(args) => args.run(),
         Command::SampleExtraction(args) => args.run(),
     }
