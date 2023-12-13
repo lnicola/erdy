@@ -46,13 +46,13 @@ impl<T: Send + 'static> ThreadedBlockReader<T> {
 
             let worker = thread::spawn(move || {
                 let dataset = Dataset::open(path).unwrap();
-                let band_count = dataset.raster_count() as usize;
+                let band_count = dataset.raster_count();
 
                 for (x, y, data) in rx {
                     let mut block_reducer = R::new(band_count, data);
 
                     for band_index in 0..band_count {
-                        let band = dataset.rasterband(band_index as isize + 1).unwrap();
+                        let band = dataset.rasterband(band_index + 1).unwrap();
                         let block = band.read_typed_block(x, y).unwrap();
                         block_reducer.push_block(band_index, band_count, block);
                     }

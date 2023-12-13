@@ -16,9 +16,10 @@ use gdal::{
     raster::GdalDataType,
     spatial_ref::SpatialRef,
     vector::{
-        Feature, FieldDefn, FieldValue, Geometry, LayerAccess, OGRFieldType, OGRwkbGeometryType,
+        Feature, FieldDefn, FieldValue, Geometry, LayerAccess, LayerOptions, OGRFieldType,
+        OGRwkbGeometryType,
     },
-    Dataset, DriverManager, GeoTransformEx, LayerOptions, Metadata,
+    Dataset, DriverManager, GeoTransformEx, Metadata,
 };
 
 use crate::{
@@ -181,9 +182,9 @@ impl SampleExtractionArgs {
         let geo_transform = geo_transform.invert()?;
         let block_size = image.rasterband(1)?.block_size();
 
-        let band_count = image.raster_count() as usize;
+        let band_count = image.raster_count();
         for band_idx in 0..band_count {
-            let band = image.rasterband(band_idx as isize + 1)?;
+            let band = image.rasterband(band_idx + 1)?;
             assert_eq!(band.block_size(), block_size);
         }
 
@@ -195,7 +196,7 @@ impl SampleExtractionArgs {
 
         let mut band_fields = Vec::with_capacity(band_count);
         for band_index in 1..=band_count {
-            let band = image.rasterband(band_index as isize)?;
+            let band = image.rasterband(band_index)?;
             let name = match self.fields.as_ref() {
                 Some(fields) => fields[band_index - 1].clone(),
                 None => match band.description() {
