@@ -59,6 +59,7 @@ pub struct SampleExtractionArgs {
 
 #[derive(Clone, Copy)]
 enum BandValue {
+    U8(u8),
     U16(u16),
     I16(i16),
     F32(f32),
@@ -105,6 +106,12 @@ impl BlockReducer for SamplingBlockReducer {
 
     fn push_block(&mut self, band_index: usize, band_count: usize, block: TypedBlock) {
         match block {
+            TypedBlock::U8(buf) => {
+                for (idx, point) in self.block_points.points.iter().enumerate() {
+                    let pix = buf[(point.by, point.bx)];
+                    self.samples[band_count * idx + band_index] = BandValue::U8(pix);
+                }
+            }
             TypedBlock::U16(buf) => {
                 for (idx, point) in self.block_points.points.iter().enumerate() {
                     let pix = buf[(point.by, point.bx)];
@@ -328,6 +335,12 @@ impl SampleExtractionArgs {
                             }
                             for band_idx in 0..band_count {
                                 match sample_values[band_count * sample_idx + band_idx] {
+                                    BandValue::U8(value) => {
+                                        feature.set_field_integer_by_index(
+                                            band_idx + field_offset,
+                                            value as i32,
+                                        );
+                                    }
                                     BandValue::U16(value) => {
                                         feature.set_field_integer_by_index(
                                             band_idx + field_offset,
