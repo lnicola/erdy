@@ -173,6 +173,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
 
 [[package]]
+name = "erdy"
+version = "0.1.2"
+dependencies = [
+ "anyhow",
+ "clap",
+ "gdal",
+ "gdal-sys",
+ "indicatif",
+ "ndarray",
+ "num-traits",
+ "tempfile",
+ "tracing",
+ "tracing-subscriber",
+ "walkdir",
+]
+
+[[package]]
 name = "errno"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -212,23 +229,6 @@ dependencies = [
  "libc",
  "pkg-config",
  "semver",
-]
-
-[[package]]
-name = "geo-tools"
-version = "0.1.2"
-dependencies = [
- "anyhow",
- "clap",
- "gdal",
- "gdal-sys",
- "indicatif",
- "ndarray",
- "num-traits",
- "tempfile",
- "tracing",
- "tracing-subscriber",
- "walkdir",
 ]
 
 [[package]]

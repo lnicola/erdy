@@ -8,4 +8,4 @@ COPY src ./src/
 RUN $HOME/.cargo/bin/cargo build --release
 
 FROM ghcr.io/osgeo/gdal:ubuntu-full-3.8.0
-COPY --from=0 /app/target/release/geo-tools /usr/local/bin/
+COPY --from=0 /app/target/release/erdy /usr/local/bin/

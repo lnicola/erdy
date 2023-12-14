@@ -1,4 +1,4 @@
-# `geo-tools`
+# `erdy`
 
 A collection of useful GIS tools, implemented with a focus on performance.
 
@@ -16,4 +16,4 @@ Install GDAL, Rust and run `cargo run --release`.
 
 ## Docker image
 
-`docker pull docker.io/lnicola/geo-tools`
+`docker pull docker.io/lnicola/erdy`

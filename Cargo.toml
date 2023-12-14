@@ -1,5 +1,5 @@
 [package]
-name = "geo-tools"
+name = "erdy"
 rust-version = "1.71"
 version = "0.1.2"
 edition = "2021"
