@@ -86,7 +86,7 @@ impl BandSelectArgs {
             for x in 0..blocks_x {
                 let mask_block = mask.rasterband(1)?.read_typed_block(x, y)?;
                 let mut required_labels = Vec::new();
-                let mut block_dim = None;
+                let block_dim;
                 match &mask_block {
                     TypedBlock::U8(mask_block) => {
                         gather_labels(mask_block.view(), &mut required_labels);

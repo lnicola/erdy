@@ -129,7 +129,7 @@ impl BatchTranslateArgs {
                     &mut err,
                 )
             };
-            if ds_ptr != ptr::null_mut() {
+            if !ds_ptr.is_null() {
                 unsafe { gdal_sys::GDALClose(ds_ptr) };
             } else {
                 let path = temp_path.display();
@@ -209,7 +209,7 @@ impl BatchTranslateArgs {
                             ptr::null_mut(),
                         )
                     };
-                    if rv != ptr::null_mut() {
+                    if !rv.is_null() {
                         bar.inc_length(1);
 
                         tx.send(entry)?;
