@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use gdal::{errors::GdalError, raster::RasterCreationOption, Dataset, DriverManager};
-use ndarray::Array2;
+use ndarray::{Array2, ArrayView2};
+use num_traits::NumCast;
 
 use crate::gdal_ext::{RasterBandExt, TypedBlock};
 
@@ -25,6 +26,16 @@ pub struct BandSelectArgs {
     /// Output format
     #[arg(short, long)]
     format: String,
+}
+
+fn gather_labels<T: NumCast>(block: ArrayView2<T>, labels: &mut Vec<usize>) {
+    for mask_pixel in &block {
+        if let Some(label) = mask_pixel.to_usize() {
+            if !labels.contains(&label) {
+                labels.push(label);
+            }
+        }
+    }
 }
 
 impl BandSelectArgs {
@@ -56,6 +67,10 @@ impl BandSelectArgs {
                         key: "COMPRESS",
                         value: "DEFLATE",
                     },
+                    RasterCreationOption {
+                        key: "NUM_THREADS",
+                        value: "ALL_CPUS",
+                    },
                 ],
             )?;
         output.set_projection(&mask.projection())?;
@@ -70,37 +85,46 @@ impl BandSelectArgs {
         for y in 0..blocks_y {
             for x in 0..blocks_x {
                 let mask_block = mask.rasterband(1)?.read_typed_block(x, y)?;
-                match mask_block {
+                let mut required_labels = Vec::new();
+                let mut block_dim = None;
+                match &mask_block {
                     TypedBlock::U8(mask_block) => {
-                        let mut required_labels = Vec::new();
-                        for mask_pixel in &mask_block {
-                            if !required_labels.contains(&(*mask_pixel as usize)) {
-                                required_labels.push(*mask_pixel as usize);
+                        gather_labels(mask_block.view(), &mut required_labels);
+                        block_dim = Some(mask_block.raw_dim());
+                    }
+                    TypedBlock::U16(mask_block) => {
+                        gather_labels(mask_block.view(), &mut required_labels);
+                        block_dim = Some(mask_block.raw_dim());
+                    }
+                    TypedBlock::I16(mask_block) => {
+                        gather_labels(mask_block.view(), &mut required_labels);
+                        block_dim = Some(mask_block.raw_dim());
+                    }
+                    TypedBlock::F32(_) => unimplemented!(),
+                }
+                let input_blocks = required_labels
+                    .iter()
+                    .copied()
+                    .map(|label| {
+                        for (&dataset_label, dataset) in self.input_labels.iter().zip(&inputs) {
+                            if dataset_label == label {
+                                return Ok::<_, GdalError>(Some((
+                                    label,
+                                    dataset.rasterband(1)?.read_typed_block(x, y)?,
+                                )));
                             }
                         }
-                        let input_blocks = required_labels
-                            .iter()
-                            .copied()
-                            .map(|label| {
-                                for (&dataset_label, dataset) in
-                                    self.input_labels.iter().zip(&inputs)
-                                {
-                                    if dataset_label == label {
-                                        return Ok::<_, GdalError>(Some((
-                                            label,
-                                            dataset.rasterband(1)?.read_typed_block(x, y)?,
-                                        )));
-                                    }
-                                }
-                                Ok(None)
-                            })
-                            .filter_map(|e| match e {
-                                Ok(Some(e)) => Some(Ok(e)),
-                                Ok(None) => None,
-                                Err(e) => Some(Err(e)),
-                            })
-                            .collect::<Result<Vec<_>, _>>()?;
+                        Ok(None)
+                    })
+                    .filter_map(|e| match e {
+                        Ok(Some(e)) => Some(Ok(e)),
+                        Ok(None) => None,
+                        Err(e) => Some(Err(e)),
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
 
+                match mask_block {
+                    TypedBlock::U8(mask_block) => {
                         if input_blocks.iter().all(|(_, block)| block.is_i16()) {
                             let input_blocks = input_blocks
                                 .into_iter()
@@ -110,7 +134,7 @@ impl BandSelectArgs {
                                 .into_iter()
                                 .map(|(label, input)| (label, input.into_iter()))
                                 .collect::<Vec<_>>();
-                            let mut output_block = Array2::<i16>::zeros(mask_block.raw_dim());
+                            let mut output_block = Array2::zeros(block_dim.unwrap());
                             for (out_pixel, mask_pixel) in output_block.iter_mut().zip(mask_block) {
                                 let mut found = false;
                                 for (label, it) in input_iterators.iter_mut() {
@@ -130,9 +154,9 @@ impl BandSelectArgs {
                             unimplemented!();
                         }
                     }
-                    _ => {
-                        unimplemented!();
-                    }
+                    TypedBlock::U16(_) => unimplemented!(),
+                    TypedBlock::I16(_) => unimplemented!(),
+                    TypedBlock::F32(_) => unimplemented!(),
                 }
             }
         }

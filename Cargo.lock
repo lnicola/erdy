@@ -224,6 +224,7 @@ dependencies = [
  "gdal-sys",
  "indicatif",
  "ndarray",
+ "num-traits",
  "tempfile",
  "tracing",
  "tracing-subscriber",
