@@ -67,10 +67,6 @@ impl BandSelectArgs {
                         key: "COMPRESS",
                         value: "DEFLATE",
                     },
-                    RasterCreationOption {
-                        key: "NUM_THREADS",
-                        value: "ALL_CPUS",
-                    },
                 ],
             )?;
         output.set_projection(&mask.projection())?;
