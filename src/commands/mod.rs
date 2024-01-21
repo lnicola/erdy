@@ -1,5 +1,6 @@
 mod band_select;
 mod batch_translate;
+mod sample_augmentation;
 mod sample_extraction;
 
 use clap::Subcommand;
@@ -7,6 +8,8 @@ use clap::Subcommand;
 pub use band_select::BandSelectArgs;
 pub use batch_translate::BatchTranslateArgs;
 pub use sample_extraction::SampleExtractionArgs;
+
+use self::sample_augmentation::SampleAugmentationArgs;
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
@@ -16,4 +19,6 @@ pub enum Command {
     BatchTranslate(BatchTranslateArgs),
     /// Sample an image at given positions and output a table of the band values.
     SampleExtraction(SampleExtractionArgs),
+    /// Augment a vector dataset.
+    SampleAugmentation(SampleAugmentationArgs),
 }
