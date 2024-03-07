@@ -272,10 +272,9 @@ impl SampleAugmentationArgs {
                             }
                         }
 
-                        if output_data.len() / sample_table.columns() > 4096 {
+                        if output_data.len() / sample_table.columns() >= 4096 {
                             let tmp_data = mem::take(&mut output_data);
                             let output_table = SampleTable::new(sample_table.columns(), tmp_data);
-                            dbg!(output_table.rows());
                             if tx.send(output_table).is_err() {
                                 break;
                             }
@@ -313,7 +312,6 @@ impl SampleAugmentationArgs {
                 for batch in rx {
                     let tx = output_dataset.start_transaction()?;
                     let layer = tx.layer(0)?;
-                    dbg!(batch.rows());
                     for idx in 0..batch.rows() {
                         let feature = Feature::new(layer.defn())?;
                         for (col_idx, value) in batch.sample(idx).iter().copied().enumerate() {
