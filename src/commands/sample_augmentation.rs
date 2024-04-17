@@ -286,8 +286,6 @@ impl SampleAugmentationArgs {
                         dbg!(output_table.rows());
                         let _ = tx.send(output_table);
                     }
-
-                    dbg!("done");
                 });
             }
             drop(tx);
