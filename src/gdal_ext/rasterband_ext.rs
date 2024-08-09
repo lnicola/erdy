@@ -1,12 +1,11 @@
-use gdal::raster::{GdalDataType, RasterBand};
-use ndarray::Array2;
+use gdal::raster::{Buffer, GdalDataType, RasterBand};
 
 #[derive(Debug)]
 pub enum TypedBlock {
-    U8(Array2<u8>),
-    U16(Array2<u16>),
-    I16(Array2<i16>),
-    F32(Array2<f32>),
+    U8(Buffer<u8>),
+    U16(Buffer<u16>),
+    I16(Buffer<i16>),
+    F32(Buffer<f32>),
 }
 
 impl TypedBlock {
@@ -42,7 +41,7 @@ impl TypedBlock {
         matches!(self, Self::F32(..))
     }
 
-    pub fn as_u8(&self) -> Option<&Array2<u8>> {
+    pub fn as_u8(&self) -> Option<&Buffer<u8>> {
         if let Self::U8(v) = self {
             Some(v)
         } else {
@@ -50,7 +49,7 @@ impl TypedBlock {
         }
     }
 
-    pub fn as_u16(&self) -> Option<&Array2<u16>> {
+    pub fn as_u16(&self) -> Option<&Buffer<u16>> {
         if let Self::U16(v) = self {
             Some(v)
         } else {
@@ -58,7 +57,7 @@ impl TypedBlock {
         }
     }
 
-    pub fn as_i16(&self) -> Option<&Array2<i16>> {
+    pub fn as_i16(&self) -> Option<&Buffer<i16>> {
         if let Self::I16(v) = self {
             Some(v)
         } else {
@@ -66,7 +65,7 @@ impl TypedBlock {
         }
     }
 
-    pub fn as_f32(&self) -> Option<&Array2<f32>> {
+    pub fn as_f32(&self) -> Option<&Buffer<f32>> {
         if let Self::F32(v) = self {
             Some(v)
         } else {
@@ -74,7 +73,7 @@ impl TypedBlock {
         }
     }
 
-    pub fn try_into_u8(self) -> Result<Array2<u8>, Self> {
+    pub fn try_into_u8(self) -> Result<Buffer<u8>, Self> {
         if let Self::U8(v) = self {
             Ok(v)
         } else {
@@ -82,7 +81,7 @@ impl TypedBlock {
         }
     }
 
-    pub fn try_into_u16(self) -> Result<Array2<u16>, Self> {
+    pub fn try_into_u16(self) -> Result<Buffer<u16>, Self> {
         if let Self::U16(v) = self {
             Ok(v)
         } else {
@@ -90,7 +89,7 @@ impl TypedBlock {
         }
     }
 
-    pub fn try_into_i16(self) -> Result<Array2<i16>, Self> {
+    pub fn try_into_i16(self) -> Result<Buffer<i16>, Self> {
         if let Self::I16(v) = self {
             Ok(v)
         } else {
@@ -98,7 +97,7 @@ impl TypedBlock {
         }
     }
 
-    pub fn try_into_f32(self) -> Result<Array2<f32>, Self> {
+    pub fn try_into_f32(self) -> Result<Buffer<f32>, Self> {
         if let Self::F32(v) = self {
             Ok(v)
         } else {

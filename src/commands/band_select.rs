@@ -1,7 +1,11 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use gdal::{errors::GdalError, raster::RasterCreationOption, Dataset, DriverManager};
+use gdal::{
+    errors::GdalError,
+    raster::{Buffer, GdalType, RasterCreationOptions},
+    Dataset, DriverManager,
+};
 use ndarray::{Array2, ArrayView2};
 use num_traits::NumCast;
 
@@ -28,8 +32,8 @@ pub struct BandSelectArgs {
     format: String,
 }
 
-fn gather_labels<T: NumCast>(block: ArrayView2<T>, labels: &mut Vec<usize>) {
-    for mask_pixel in &block {
+fn gather_labels<T: NumCast>(block: &[T], labels: &mut Vec<usize>) {
+    for mask_pixel in block {
         if let Some(label) = mask_pixel.to_usize() {
             if !labels.contains(&label) {
                 labels.push(label);
@@ -55,19 +59,10 @@ impl BandSelectArgs {
         let mut output = DriverManager::get_driver_by_name(&self.format)?
             .create_with_band_type_with_options::<i16, _>(
                 &self.output,
-                raster_size.0 as isize,
-                raster_size.1 as isize,
+                raster_size.0,
+                raster_size.1,
                 1,
-                &[
-                    RasterCreationOption {
-                        key: "TILED",
-                        value: "YES",
-                    },
-                    RasterCreationOption {
-                        key: "COMPRESS",
-                        value: "DEFLATE",
-                    },
-                ],
+                &RasterCreationOptions::from_iter(["TILED=YES", "COMPRESS=DEFLATE"]),
             )?;
         output.set_projection(&mask.projection())?;
         output.set_geo_transform(&mask.geo_transform()?)?;
@@ -82,19 +77,19 @@ impl BandSelectArgs {
             for x in 0..blocks_x {
                 let mask_block = mask.rasterband(1)?.read_typed_block(x, y)?;
                 let mut required_labels = Vec::new();
-                let block_dim;
+                let block_shape;
                 match &mask_block {
                     TypedBlock::U8(mask_block) => {
-                        gather_labels(mask_block.view(), &mut required_labels);
-                        block_dim = Some(mask_block.raw_dim());
+                        gather_labels(mask_block.data(), &mut required_labels);
+                        block_shape = Some(mask_block.shape());
                     }
                     TypedBlock::U16(mask_block) => {
-                        gather_labels(mask_block.view(), &mut required_labels);
-                        block_dim = Some(mask_block.raw_dim());
+                        gather_labels(mask_block.data(), &mut required_labels);
+                        block_shape = Some(mask_block.shape());
                     }
                     TypedBlock::I16(mask_block) => {
-                        gather_labels(mask_block.view(), &mut required_labels);
-                        block_dim = Some(mask_block.raw_dim());
+                        gather_labels(mask_block.data(), &mut required_labels);
+                        block_shape = Some(mask_block.shape());
                     }
                     TypedBlock::F32(_) => unimplemented!(),
                 }
@@ -130,8 +125,13 @@ impl BandSelectArgs {
                                 .into_iter()
                                 .map(|(label, input)| (label, input.into_iter()))
                                 .collect::<Vec<_>>();
-                            let mut output_block = Array2::zeros(block_dim.unwrap());
-                            for (out_pixel, mask_pixel) in output_block.iter_mut().zip(mask_block) {
+
+                            let block_shape = block_shape.unwrap();
+                            let mut output_block =
+                                Buffer::new(block_shape, vec![0; block_shape.0 * block_shape.1]);
+                            for (out_pixel, mask_pixel) in
+                                output_block.data_mut().iter_mut().zip(mask_block)
+                            {
                                 let mut found = false;
                                 for (label, it) in input_iterators.iter_mut() {
                                     if *label == mask_pixel as usize {
@@ -145,7 +145,7 @@ impl BandSelectArgs {
                                     *out_pixel = 0;
                                 }
                             }
-                            output_band.write_block((x, y), output_block)?;
+                            output_band.write_block((x, y), &mut output_block)?;
                         } else {
                             unimplemented!();
                         }

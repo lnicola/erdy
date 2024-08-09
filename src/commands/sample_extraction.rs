@@ -13,6 +13,7 @@ use std::{
 use anyhow::Result;
 use clap::Parser;
 use gdal::{
+    config,
     raster::GdalDataType,
     spatial_ref::SpatialRef,
     vector::{
@@ -184,6 +185,8 @@ struct BlockPoints {
 
 impl SampleExtractionArgs {
     pub fn run(&self) -> Result<()> {
+        config::set_config_option("OGR_SQLITE_SYNCHRONOUS", "OFF")?;
+
         let image = Dataset::open(&self.input)?;
         let geo_transform = image.geo_transform()?;
         let geo_transform = geo_transform.invert()?;

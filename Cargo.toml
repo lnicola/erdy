@@ -4,15 +4,17 @@ rust-version = "1.71"
 version = "0.1.2"
 edition = "2021"
 license = "MIT OR Apache-2.0"
+authors = ["TBD"]
+description = "TBD"
 
 [dependencies]
 anyhow = "1.0"
 ball-tree = "0.4.0"
 clap = { version = "4.4", features = ["derive"] }
-# gdal = { version = "0.16", features = ["array"] }
-# gdal-sys = "0.9"
-gdal = { version = "0.16", git = "https://github.com/georust/gdal", features = ["array"] }
-gdal-sys = { version = "0.9", git = "https://github.com/georust/gdal" }
+gdal = { version = "0.17", features = ["array"] }
+gdal-sys = "0.10"
+# gdal = { version = "0.17", git = "https://github.com/georust/gdal", features = ["array"] }
+# gdal-sys = { version = "0.10", git = "https://github.com/georust/gdal" }
 indicatif = "0.17.7"
 ndarray = "0.15"
 num-traits = "0.2.17"
@@ -24,3 +26,6 @@ walkdir = "2.4.0"
 
 [profile.release]
 debug = 2
+
+[package.metadata.generate-rpm]
+assets = [{ source = "target/release/erdy", dest = "/usr/bin/erdy", mode = "755" }]
