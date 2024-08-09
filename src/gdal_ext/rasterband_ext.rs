@@ -104,6 +104,15 @@ impl TypedBlock {
             Err(self)
         }
     }
+
+    pub fn shape(&self) -> (usize, usize) {
+        match self {
+            TypedBlock::U8(buf) => buf.shape(),
+            TypedBlock::U16(buf) => buf.shape(),
+            TypedBlock::I16(buf) => buf.shape(),
+            TypedBlock::F32(buf) => buf.shape(),
+        }
+    }
 }
 
 pub trait RasterBandExt {

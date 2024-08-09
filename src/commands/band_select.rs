@@ -6,7 +6,6 @@ use gdal::{
     raster::{Buffer, GdalType, RasterCreationOptions},
     Dataset, DriverManager,
 };
-use ndarray::{Array2, ArrayView2};
 use num_traits::NumCast;
 
 use crate::gdal_ext::{RasterBandExt, TypedBlock};
@@ -77,19 +76,16 @@ impl BandSelectArgs {
             for x in 0..blocks_x {
                 let mask_block = mask.rasterband(1)?.read_typed_block(x, y)?;
                 let mut required_labels = Vec::new();
-                let block_shape;
+                let block_shape = mask_block.shape();
                 match &mask_block {
                     TypedBlock::U8(mask_block) => {
                         gather_labels(mask_block.data(), &mut required_labels);
-                        block_shape = Some(mask_block.shape());
                     }
                     TypedBlock::U16(mask_block) => {
                         gather_labels(mask_block.data(), &mut required_labels);
-                        block_shape = Some(mask_block.shape());
                     }
                     TypedBlock::I16(mask_block) => {
                         gather_labels(mask_block.data(), &mut required_labels);
-                        block_shape = Some(mask_block.shape());
                     }
                     TypedBlock::F32(_) => unimplemented!(),
                 }
@@ -126,7 +122,6 @@ impl BandSelectArgs {
                                 .map(|(label, input)| (label, input.into_iter()))
                                 .collect::<Vec<_>>();
 
-                            let block_shape = block_shape.unwrap();
                             let mut output_block =
                                 Buffer::new(block_shape, vec![0; block_shape.0 * block_shape.1]);
                             for (out_pixel, mask_pixel) in
