@@ -48,7 +48,7 @@ impl BandSelectArgs {
         let inputs = self
             .inputs
             .iter()
-            .map(|f| Dataset::open(f))
+            .map(Dataset::open)
             .collect::<Result<Vec<Dataset>, _>>()?;
         let mask = Dataset::open(&self.mask)?;
 
