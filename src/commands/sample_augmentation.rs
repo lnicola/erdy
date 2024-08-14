@@ -11,7 +11,7 @@ use anyhow::Result;
 use ball_tree::{BallTree, Point};
 use clap::Parser;
 use gdal::{
-    vector::{Feature, FieldDefn, Geometry, LayerAccess, LayerOptions},
+    vector::{Feature, FieldDefn, LayerAccess, LayerOptions},
     Dataset, DriverManager,
 };
 use gdal_sys::{OGRFieldType, OGRwkbGeometryType::wkbNone};

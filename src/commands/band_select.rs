@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use clap::Parser;
 use gdal::{
     errors::GdalError,
-    raster::{Buffer, GdalType, RasterCreationOptions},
+    raster::{Buffer, RasterCreationOptions},
     Dataset, DriverManager,
 };
 use num_traits::NumCast;
