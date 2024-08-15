@@ -187,7 +187,7 @@ impl SampleAugmentationArgs {
         for (idx, field) in layer_defn.fields().enumerate() {
             let name = field.name();
             if !self.exclude.contains(&name) && name != self.field {
-                included_fields.push(idx);
+                included_fields.push((idx, name));
             }
         }
 
@@ -195,7 +195,7 @@ impl SampleAugmentationArgs {
         layer.set_attribute_filter(&attribute_filter)?;
         let mut data = Vec::new();
         for feature in layer.features() {
-            for &idx in &included_fields {
+            for &(idx, _) in &included_fields {
                 let value = feature.field_as_double(idx as i32)?.unwrap();
                 data.push(value);
             }
@@ -283,7 +283,6 @@ impl SampleAugmentationArgs {
 
                     if !output_data.is_empty() {
                         let output_table = SampleTable::new(sample_table.columns(), output_data);
-                        dbg!(output_table.rows());
                         let _ = tx.send(output_table);
                     }
                 });
@@ -301,9 +300,8 @@ impl SampleAugmentationArgs {
                     ty: wkbNone,
                     options: None,
                 })?;
-                for idx in included_fields {
-                    let field_defn =
-                        FieldDefn::new(&format!("field_{idx}"), OGRFieldType::OFTReal)?;
+                for (_, name) in &included_fields {
+                    let field_defn = FieldDefn::new(name, OGRFieldType::OFTReal)?;
                     field_defn.add_to_layer(&layer)?;
                 }
 
