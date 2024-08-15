@@ -78,6 +78,7 @@ impl BatchTranslateArgs {
             let Ok(temp) = Builder::new()
                 .prefix(&format!("temp_{}", entry.file_name().to_string_lossy()))
                 .suffix(&format!(".{}", self.extension))
+                .keep(true)
                 .tempfile_in(parent)
             else {
                 let path = entry.path().display();
@@ -87,6 +88,7 @@ impl BatchTranslateArgs {
 
             match entry.metadata() {
                 Ok(metadata) => {
+                    // FIXME: use Builder::permissions
                     if let Err(e) = temp.as_file().set_permissions(metadata.permissions()) {
                         let path = temp.path().display();
                         tracing::error!(%e, %path, "unable to set output file permissions");
@@ -98,19 +100,8 @@ impl BatchTranslateArgs {
                 }
             }
 
-            let temp_path = match temp.keep() {
-                Ok((_, path)) => path,
-                Err(e) => {
-                    let (error, file) = (e.error, e.file);
-                    let path = file.path();
-                    let path = path.display();
-                    tracing::error!(%error, %path, "unable to persist temporary file");
-                    continue;
-                }
-            };
-
-            let Ok(c_output) = CString::new(temp_path.as_os_str().as_bytes()) else {
-                let path = temp_path.display();
+            let Ok(c_output) = CString::new(temp.path().as_os_str().as_bytes()) else {
+                let path = temp.path().display();
                 tracing::error!(%path, "invalid output name");
                 continue;
             };
@@ -132,7 +123,7 @@ impl BatchTranslateArgs {
             if !ds_ptr.is_null() {
                 unsafe { gdal_sys::GDALClose(ds_ptr) };
             } else {
-                let path = temp_path.display();
+                let path = temp.path().display();
                 tracing::error!(%path, "unable to close output dataset");
             }
 
@@ -145,12 +136,12 @@ impl BatchTranslateArgs {
                 }
 
                 {
-                    let temp_path = temp_path.display();
+                    let temp_path = temp.path().display();
                     let destination = destination.display();
                     tracing::debug!(%temp_path, %destination, "renaming file");
                 }
-                if let Err(e) = fs::rename(&temp_path, &destination) {
-                    let temp_path = temp_path.display();
+                if let Err(e) = fs::rename(temp.path(), &destination) {
+                    let temp_path = temp.path().display();
                     let destination = destination.display();
                     tracing::error!(%e, %temp_path, %destination, "unable to rename output file");
                 }
