@@ -314,7 +314,7 @@ impl SampleAugmentationArgs {
                     let tx = output_dataset.start_transaction()?;
                     let layer = tx.layer(0)?;
                     for idx in 0..batch.rows() {
-                        let feature = Feature::new(layer.defn())?;
+                        let mut feature = Feature::new(layer.defn())?;
                         for (col_idx, value) in batch.sample(idx).iter().copied().enumerate() {
                             feature.set_field_double_by_index(col_idx, value);
                         }
