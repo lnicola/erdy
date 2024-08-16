@@ -24,8 +24,5 @@ tracing = { version = "0.1", default-features = false, features = ["std"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "ansi", "smallvec"] }
 walkdir = "2.5"
 
-[profile.release]
-debug = 2
-
 [package.metadata.generate-rpm]
 assets = [{ source = "target/release/erdy", dest = "/usr/bin/erdy", mode = "755" }]
