@@ -20,8 +20,8 @@ indicatif = "0.17"
 num-traits = "0.2"
 rand = { version = "0.8.5", features = ["small_rng"] }
 tempfile = "3.12"
-tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+tracing = { version = "0.1", default-features = false, features = ["std"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "ansi", "smallvec"] }
 walkdir = "2.5"
 
 [profile.release]
