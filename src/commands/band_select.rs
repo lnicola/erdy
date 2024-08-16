@@ -8,7 +8,7 @@ use gdal::{
 };
 use num_traits::NumCast;
 
-use crate::gdal_ext::{RasterBandExt, TypedBlock};
+use crate::gdal_ext::{RasterBandExt, TypedBuffer};
 
 #[derive(Debug, Parser)]
 pub struct BandSelectArgs {
@@ -78,16 +78,19 @@ impl BandSelectArgs {
                 let mut required_labels = Vec::new();
                 let block_shape = mask_block.shape();
                 match &mask_block {
-                    TypedBlock::U8(mask_block) => {
+                    TypedBuffer::U8(mask_block) => {
                         gather_labels(mask_block.data(), &mut required_labels);
                     }
-                    TypedBlock::U16(mask_block) => {
+                    TypedBuffer::I8(mask_block) => {
                         gather_labels(mask_block.data(), &mut required_labels);
                     }
-                    TypedBlock::I16(mask_block) => {
+                    TypedBuffer::U16(mask_block) => {
                         gather_labels(mask_block.data(), &mut required_labels);
                     }
-                    TypedBlock::F32(_) => unimplemented!(),
+                    TypedBuffer::I16(mask_block) => {
+                        gather_labels(mask_block.data(), &mut required_labels);
+                    }
+                    TypedBuffer::F32(_) => unimplemented!(),
                 }
                 let input_blocks = required_labels
                     .iter()
@@ -111,7 +114,7 @@ impl BandSelectArgs {
                     .collect::<Result<Vec<_>, _>>()?;
 
                 match mask_block {
-                    TypedBlock::U8(mask_block) => {
+                    TypedBuffer::U8(mask_block) => {
                         if input_blocks.iter().all(|(_, block)| block.is_i16()) {
                             let input_blocks = input_blocks
                                 .into_iter()
@@ -145,9 +148,10 @@ impl BandSelectArgs {
                             unimplemented!();
                         }
                     }
-                    TypedBlock::U16(_) => unimplemented!(),
-                    TypedBlock::I16(_) => unimplemented!(),
-                    TypedBlock::F32(_) => unimplemented!(),
+                    TypedBuffer::I8(_) => unimplemented!(),
+                    TypedBuffer::U16(_) => unimplemented!(),
+                    TypedBuffer::I16(_) => unimplemented!(),
+                    TypedBuffer::F32(_) => unimplemented!(),
                 }
             }
         }

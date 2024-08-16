@@ -24,7 +24,7 @@ use gdal::{
 };
 
 use crate::{
-    gdal_ext::{FeatureExt, TypedBlock},
+    gdal_ext::{FeatureExt, TypedBuffer},
     threaded_block_reader::{BlockFinalizer, BlockReducer, ThreadedBlockReader},
 };
 
@@ -61,6 +61,7 @@ pub struct SampleExtractionArgs {
 #[derive(Clone, Copy)]
 enum BandValue {
     U8(u8),
+    I8(i8),
     U16(u16),
     I16(i16),
     F32(f32),
@@ -105,27 +106,33 @@ impl BlockReducer for SamplingBlockReducer {
         }
     }
 
-    fn push_block(&mut self, band_index: usize, band_count: usize, block: TypedBlock) {
+    fn push_block(&mut self, band_index: usize, band_count: usize, block: TypedBuffer) {
         match block {
-            TypedBlock::U8(buf) => {
+            TypedBuffer::U8(buf) => {
                 for (idx, point) in self.block_points.points.iter().enumerate() {
                     let pix = buf[(point.by, point.bx)];
                     self.samples[band_count * idx + band_index] = BandValue::U8(pix);
                 }
             }
-            TypedBlock::U16(buf) => {
+            TypedBuffer::I8(buf) => {
+                for (idx, point) in self.block_points.points.iter().enumerate() {
+                    let pix = buf[(point.by, point.bx)];
+                    self.samples[band_count * idx + band_index] = BandValue::I8(pix);
+                }
+            }
+            TypedBuffer::U16(buf) => {
                 for (idx, point) in self.block_points.points.iter().enumerate() {
                     let pix = buf[(point.by, point.bx)];
                     self.samples[band_count * idx + band_index] = BandValue::U16(pix);
                 }
             }
-            TypedBlock::I16(buf) => {
+            TypedBuffer::I16(buf) => {
                 for (idx, point) in self.block_points.points.iter().enumerate() {
                     let pix = buf[(point.by, point.bx)];
                     self.samples[band_count * idx + band_index] = BandValue::I16(pix);
                 }
             }
-            TypedBlock::F32(buf) => {
+            TypedBuffer::F32(buf) => {
                 for (idx, point) in self.block_points.points.iter().enumerate() {
                     let pix = buf[(point.by, point.bx)];
                     self.samples[band_count * idx + band_index] = BandValue::F32(pix);
@@ -340,6 +347,10 @@ impl SampleExtractionArgs {
                                 let field_index = field_offset + band_idx;
                                 match sample_values[band_count * sample_idx + band_idx] {
                                     BandValue::U8(value) => {
+                                        feature
+                                            .set_field_integer_by_index(field_index, value as i32);
+                                    }
+                                    BandValue::I8(value) => {
                                         feature
                                             .set_field_integer_by_index(field_index, value as i32);
                                     }

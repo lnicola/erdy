@@ -7,14 +7,14 @@ use std::{
 
 use gdal::Dataset;
 
-use crate::gdal_ext::{RasterBandExt, TypedBlock};
+use crate::gdal_ext::{RasterBandExt, TypedBuffer};
 
 pub trait BlockReducer {
     type InputState;
     type Output: Send + 'static;
 
     fn new(band_count: usize, input_state: Self::InputState) -> Self;
-    fn push_block(&mut self, band_index: usize, band_count: usize, block: TypedBlock);
+    fn push_block(&mut self, band_index: usize, band_count: usize, block: TypedBuffer);
     fn finalize(self) -> Self::Output;
 }
 
