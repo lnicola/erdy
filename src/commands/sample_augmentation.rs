@@ -40,6 +40,10 @@ pub struct SampleAugmentationArgs {
     #[arg(long)]
     samples: usize,
 
+    /// Number of nearest neighbors
+    #[arg(long, default_value_t = 5)]
+    neighbors: usize,
+
     /// Excluded fields
     #[arg(long, num_args = 1..)]
     exclude: Vec<String>,
@@ -211,6 +215,7 @@ impl SampleAugmentationArgs {
 
         println!("{} rows", samples.len());
 
+        let k_nearest_neighbors = self.neighbors.min(samples.len() - 1);
         let values = vec![(); samples.len()];
 
         let now = Instant::now();
@@ -262,7 +267,7 @@ impl SampleAugmentationArgs {
                         let sample = Sample::from_ref(sample_table.clone(), sample_idx);
                         let mut rng = rng.clone();
                         for _ in 0..*count {
-                            let idx = rng.gen_range(0..3);
+                            let idx = rng.gen_range(0..k_nearest_neighbors);
                             let neighbor = query.nn(&sample).nth(idx + 1).unwrap();
                             let distance = rng.gen_range(0.0..=1.0);
                             sample.lerp(neighbor.0, distance, tmp.as_mut_slice());
