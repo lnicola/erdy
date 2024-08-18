@@ -90,6 +90,12 @@ impl BandSelectArgs {
                     TypedBuffer::I16(mask_block) => {
                         gather_labels(mask_block.data(), &mut required_labels);
                     }
+                    TypedBuffer::U32(mask_block) => {
+                        gather_labels(mask_block.data(), &mut required_labels);
+                    }
+                    TypedBuffer::I32(mask_block) => {
+                        gather_labels(mask_block.data(), &mut required_labels);
+                    }
                     TypedBuffer::F32(_) => unimplemented!(),
                 }
                 let input_blocks = required_labels
@@ -151,6 +157,8 @@ impl BandSelectArgs {
                     TypedBuffer::I8(_) => unimplemented!(),
                     TypedBuffer::U16(_) => unimplemented!(),
                     TypedBuffer::I16(_) => unimplemented!(),
+                    TypedBuffer::U32(_) => unimplemented!(),
+                    TypedBuffer::I32(_) => unimplemented!(),
                     TypedBuffer::F32(_) => unimplemented!(),
                 }
             }

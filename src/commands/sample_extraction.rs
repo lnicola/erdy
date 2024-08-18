@@ -64,6 +64,8 @@ enum BandValue {
     I8(i8),
     U16(u16),
     I16(i16),
+    U32(u32),
+    I32(i32),
     F32(f32),
 }
 
@@ -130,6 +132,18 @@ impl BlockReducer for SamplingBlockReducer {
                 for (idx, point) in self.block_points.points.iter().enumerate() {
                     let pix = buf[(point.by, point.bx)];
                     self.samples[band_count * idx + band_index] = BandValue::I16(pix);
+                }
+            }
+            TypedBuffer::U32(buf) => {
+                for (idx, point) in self.block_points.points.iter().enumerate() {
+                    let pix = buf[(point.by, point.bx)];
+                    self.samples[band_count * idx + band_index] = BandValue::U32(pix);
+                }
+            }
+            TypedBuffer::I32(buf) => {
+                for (idx, point) in self.block_points.points.iter().enumerate() {
+                    let pix = buf[(point.by, point.bx)];
+                    self.samples[band_count * idx + band_index] = BandValue::I32(pix);
                 }
             }
             TypedBuffer::F32(buf) => {
@@ -361,6 +375,13 @@ impl SampleExtractionArgs {
                                     BandValue::I16(value) => {
                                         feature
                                             .set_field_integer_by_index(field_index, value as i32);
+                                    }
+                                    BandValue::U32(value) => {
+                                        feature
+                                            .set_field_integer_by_index(field_index, value as i32);
+                                    }
+                                    BandValue::I32(value) => {
+                                        feature.set_field_integer_by_index(field_index, value);
                                     }
                                     BandValue::F32(value) => {
                                         feature
