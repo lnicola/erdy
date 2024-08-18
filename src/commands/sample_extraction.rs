@@ -69,6 +69,7 @@ enum BandValue {
     U64(u64),
     I64(i64),
     F32(f32),
+    F64(f64),
 }
 
 #[derive(Clone)]
@@ -164,6 +165,12 @@ impl BlockReducer for SamplingBlockReducer {
                 for (idx, point) in self.block_points.points.iter().enumerate() {
                     let pix = buf[(point.by, point.bx)];
                     self.samples[band_count * idx + band_index] = BandValue::F32(pix);
+                }
+            }
+            TypedBuffer::F64(buf) => {
+                for (idx, point) in self.block_points.points.iter().enumerate() {
+                    let pix = buf[(point.by, point.bx)];
+                    self.samples[band_count * idx + band_index] = BandValue::F64(pix);
                 }
             }
         }
@@ -409,6 +416,9 @@ impl SampleExtractionArgs {
                                     BandValue::F32(value) => {
                                         feature
                                             .set_field_double_by_index(field_index, value as f64);
+                                    }
+                                    BandValue::F64(value) => {
+                                        feature.set_field_double_by_index(field_index, value);
                                     }
                                 }
                             }
