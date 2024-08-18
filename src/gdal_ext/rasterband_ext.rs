@@ -100,6 +100,7 @@ impl TypedBuffer {
         matches!(self, Self::F64(..))
     }
 
+    #[must_use]
     pub fn as_u8(&self) -> Option<&Buffer<u8>> {
         if let Self::U8(v) = self {
             Some(v)
@@ -108,6 +109,7 @@ impl TypedBuffer {
         }
     }
 
+    #[must_use]
     pub fn as_i8(&self) -> Option<&Buffer<i8>> {
         if let Self::I8(v) = self {
             Some(v)
@@ -116,6 +118,7 @@ impl TypedBuffer {
         }
     }
 
+    #[must_use]
     pub fn as_u16(&self) -> Option<&Buffer<u16>> {
         if let Self::U16(v) = self {
             Some(v)
@@ -124,6 +127,7 @@ impl TypedBuffer {
         }
     }
 
+    #[must_use]
     pub fn as_i16(&self) -> Option<&Buffer<i16>> {
         if let Self::I16(v) = self {
             Some(v)
@@ -132,6 +136,7 @@ impl TypedBuffer {
         }
     }
 
+    #[must_use]
     pub fn as_u32(&self) -> Option<&Buffer<u32>> {
         if let Self::U32(v) = self {
             Some(v)
@@ -140,6 +145,7 @@ impl TypedBuffer {
         }
     }
 
+    #[must_use]
     pub fn as_i32(&self) -> Option<&Buffer<i32>> {
         if let Self::I32(v) = self {
             Some(v)
@@ -148,6 +154,7 @@ impl TypedBuffer {
         }
     }
 
+    #[must_use]
     pub fn as_u64(&self) -> Option<&Buffer<u64>> {
         if let Self::U64(v) = self {
             Some(v)
@@ -156,6 +163,7 @@ impl TypedBuffer {
         }
     }
 
+    #[must_use]
     pub fn as_i64(&self) -> Option<&Buffer<i64>> {
         if let Self::I64(v) = self {
             Some(v)
@@ -164,6 +172,7 @@ impl TypedBuffer {
         }
     }
 
+    #[must_use]
     pub fn as_f32(&self) -> Option<&Buffer<f32>> {
         if let Self::F32(v) = self {
             Some(v)
@@ -172,6 +181,7 @@ impl TypedBuffer {
         }
     }
 
+    #[must_use]
     pub fn as_f64(&self) -> Option<&Buffer<f64>> {
         if let Self::F64(v) = self {
             Some(v)
@@ -260,6 +270,7 @@ impl TypedBuffer {
         }
     }
 
+    #[must_use]
     pub fn shape(&self) -> (usize, usize) {
         match self {
             TypedBuffer::U8(buf) => buf.shape(),
