@@ -13,6 +13,8 @@ pub enum TypedBuffer {
     I16(Buffer<i16>),
     U32(Buffer<u32>),
     I32(Buffer<i32>),
+    U64(Buffer<u64>),
+    I64(Buffer<i64>),
     F32(Buffer<f32>),
 }
 
@@ -65,6 +67,22 @@ impl TypedBuffer {
         matches!(self, Self::I32(..))
     }
 
+    /// Returns `true` if the typed buffer is [`U64`].
+    ///
+    /// [`U64`]: TypedBuffer::U64
+    #[must_use]
+    pub fn is_u64(&self) -> bool {
+        matches!(self, Self::U64(..))
+    }
+
+    /// Returns `true` if the typed buffer is [`I64`].
+    ///
+    /// [`I64`]: TypedBuffer::I64
+    #[must_use]
+    pub fn is_i64(&self) -> bool {
+        matches!(self, Self::I64(..))
+    }
+
     /// Returns `true` if the typed buffer is [`F32`].
     ///
     /// [`F32`]: TypedBuffer::F32
@@ -115,6 +133,22 @@ impl TypedBuffer {
 
     pub fn as_i32(&self) -> Option<&Buffer<i32>> {
         if let Self::I32(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_u64(&self) -> Option<&Buffer<u64>> {
+        if let Self::U64(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_i64(&self) -> Option<&Buffer<i64>> {
+        if let Self::I64(v) = self {
             Some(v)
         } else {
             None
@@ -177,6 +211,22 @@ impl TypedBuffer {
         }
     }
 
+    pub fn try_into_u64(self) -> Result<Buffer<u64>, Self> {
+        if let Self::U64(v) = self {
+            Ok(v)
+        } else {
+            Err(self)
+        }
+    }
+
+    pub fn try_into_i64(self) -> Result<Buffer<i64>, Self> {
+        if let Self::I64(v) = self {
+            Ok(v)
+        } else {
+            Err(self)
+        }
+    }
+
     pub fn try_into_f32(self) -> Result<Buffer<f32>, Self> {
         if let Self::F32(v) = self {
             Ok(v)
@@ -193,6 +243,8 @@ impl TypedBuffer {
             TypedBuffer::I16(buf) => buf.shape(),
             TypedBuffer::U32(buf) => buf.shape(),
             TypedBuffer::I32(buf) => buf.shape(),
+            TypedBuffer::U64(buf) => buf.shape(),
+            TypedBuffer::I64(buf) => buf.shape(),
             TypedBuffer::F32(buf) => buf.shape(),
         }
     }
@@ -230,12 +282,18 @@ impl<'d> RasterBandExt for RasterBand<'d> {
                 let buf = self.read_block((x, y))?;
                 Ok(TypedBuffer::I32(buf))
             }
+            GdalDataType::UInt64 => {
+                let buf = self.read_block((x, y))?;
+                Ok(TypedBuffer::U64(buf))
+            }
+            GdalDataType::Int64 => {
+                let buf = self.read_block((x, y))?;
+                Ok(TypedBuffer::I64(buf))
+            }
             GdalDataType::Float32 => {
                 let buf = self.read_block((x, y))?;
                 Ok(TypedBuffer::F32(buf))
             }
-            GdalDataType::UInt64 => todo!(),
-            GdalDataType::Int64 => todo!(),
             GdalDataType::Float64 => todo!(),
         }
     }

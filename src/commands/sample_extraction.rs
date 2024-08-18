@@ -66,6 +66,8 @@ enum BandValue {
     I16(i16),
     U32(u32),
     I32(i32),
+    U64(u64),
+    I64(i64),
     F32(f32),
 }
 
@@ -144,6 +146,18 @@ impl BlockReducer for SamplingBlockReducer {
                 for (idx, point) in self.block_points.points.iter().enumerate() {
                     let pix = buf[(point.by, point.bx)];
                     self.samples[band_count * idx + band_index] = BandValue::I32(pix);
+                }
+            }
+            TypedBuffer::U64(buf) => {
+                for (idx, point) in self.block_points.points.iter().enumerate() {
+                    let pix = buf[(point.by, point.bx)];
+                    self.samples[band_count * idx + band_index] = BandValue::U64(pix);
+                }
+            }
+            TypedBuffer::I64(buf) => {
+                for (idx, point) in self.block_points.points.iter().enumerate() {
+                    let pix = buf[(point.by, point.bx)];
+                    self.samples[band_count * idx + band_index] = BandValue::I64(pix);
                 }
             }
             TypedBuffer::F32(buf) => {
@@ -382,6 +396,15 @@ impl SampleExtractionArgs {
                                     }
                                     BandValue::I32(value) => {
                                         feature.set_field_integer_by_index(field_index, value);
+                                    }
+                                    BandValue::U64(value) => {
+                                        feature.set_field_integer64_by_index(
+                                            field_index,
+                                            value as i64,
+                                        );
+                                    }
+                                    BandValue::I64(value) => {
+                                        feature.set_field_integer64_by_index(field_index, value);
                                     }
                                     BandValue::F32(value) => {
                                         feature
