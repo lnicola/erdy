@@ -31,7 +31,8 @@ pub struct BandSelectArgs {
     format: String,
 }
 
-fn gather_labels<T: NumCast>(block: &[T], labels: &mut Vec<usize>) {
+fn gather_labels<T: NumCast>(block: &[T]) -> Vec<usize> {
+    let mut labels = Vec::new();
     for mask_pixel in block {
         if let Some(label) = mask_pixel.to_usize() {
             if !labels.contains(&label) {
@@ -39,6 +40,7 @@ fn gather_labels<T: NumCast>(block: &[T], labels: &mut Vec<usize>) {
             }
         }
     }
+    labels
 }
 
 impl BandSelectArgs {
@@ -75,36 +77,19 @@ impl BandSelectArgs {
         for y in 0..blocks_y {
             for x in 0..blocks_x {
                 let mask_block = mask.rasterband(1)?.read_typed_block(x, y)?;
-                let mut required_labels = Vec::new();
                 let block_shape = mask_block.shape();
-                match &mask_block {
-                    TypedBuffer::U8(mask_block) => {
-                        gather_labels(mask_block.data(), &mut required_labels);
-                    }
-                    TypedBuffer::I8(mask_block) => {
-                        gather_labels(mask_block.data(), &mut required_labels);
-                    }
-                    TypedBuffer::U16(mask_block) => {
-                        gather_labels(mask_block.data(), &mut required_labels);
-                    }
-                    TypedBuffer::I16(mask_block) => {
-                        gather_labels(mask_block.data(), &mut required_labels);
-                    }
-                    TypedBuffer::U32(mask_block) => {
-                        gather_labels(mask_block.data(), &mut required_labels);
-                    }
-                    TypedBuffer::I32(mask_block) => {
-                        gather_labels(mask_block.data(), &mut required_labels);
-                    }
-                    TypedBuffer::U64(mask_block) => {
-                        gather_labels(mask_block.data(), &mut required_labels);
-                    }
-                    TypedBuffer::I64(mask_block) => {
-                        gather_labels(mask_block.data(), &mut required_labels);
-                    }
-                    TypedBuffer::F32(_) => unimplemented!(),
-                    TypedBuffer::F64(_) => unimplemented!(),
-                }
+                let required_labels = match &mask_block {
+                    TypedBuffer::U8(mask_block) => gather_labels(mask_block.data()),
+                    TypedBuffer::I8(mask_block) => gather_labels(mask_block.data()),
+                    TypedBuffer::U16(mask_block) => gather_labels(mask_block.data()),
+                    TypedBuffer::I16(mask_block) => gather_labels(mask_block.data()),
+                    TypedBuffer::U32(mask_block) => gather_labels(mask_block.data()),
+                    TypedBuffer::I32(mask_block) => gather_labels(mask_block.data()),
+                    TypedBuffer::U64(mask_block) => gather_labels(mask_block.data()),
+                    TypedBuffer::I64(mask_block) => gather_labels(mask_block.data()),
+                    TypedBuffer::F32(mask_block) => gather_labels(mask_block.data()),
+                    TypedBuffer::F64(mask_block) => gather_labels(mask_block.data()),
+                };
                 let input_blocks = required_labels
                     .iter()
                     .copied()
