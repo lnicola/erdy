@@ -4,7 +4,6 @@ use std::{
     path::PathBuf,
     sync::{self, Arc},
     thread,
-    time::Instant,
 };
 
 use anyhow::Result;
@@ -181,7 +180,6 @@ where
 
 impl SampleAugmentationArgs {
     pub fn run(&self) -> Result<()> {
-        let now = Instant::now();
         let input_dataset = Dataset::open(&self.input)?;
         let mut layer = input_dataset.layer(0)?;
         let input_layer_name = layer.name();
@@ -211,16 +209,11 @@ impl SampleAugmentationArgs {
         let samples = (0..sample_table.rows())
             .map(|idx| Sample::from_ref(sample_table.clone(), idx))
             .collect::<Vec<_>>();
-        println!("{}", (Instant::now() - now).as_millis());
-
-        println!("{} rows", samples.len());
 
         let k_nearest_neighbors = self.neighbors.min(samples.len() - 1);
         let values = vec![(); samples.len()];
 
-        let now = Instant::now();
         let ball_tree = BallTree::new(samples.clone(), values);
-        println!("{}", (Instant::now() - now).as_millis());
 
         let mut rng = rand::thread_rng();
 
@@ -245,18 +238,36 @@ impl SampleAugmentationArgs {
             num_threads = 1;
         }
 
-        let now = Instant::now();
+        let mut thread_items = vec![sample_table.rows() / num_threads; num_threads];
+        let remainder = sample_table.rows() % num_threads;
+        thread_items
+            .iter_mut()
+            .take(remainder)
+            .for_each(|n| *n += 1);
+        let thread_start = thread_items
+            .iter()
+            .scan(0, |sum, i| {
+                let s = *sum;
+                *sum += i;
+                Some(s)
+            })
+            .collect::<Vec<_>>();
+
         thread::scope(|s| {
             let (tx, rx) = sync::mpsc::sync_channel(num_threads * 3);
-            let thread_items = sample_table.rows() / num_threads;
+
             for thread_idx in 0..num_threads {
                 let tx = tx.clone();
                 let mut query = ball_tree.query();
                 let neighbors = &neighbors;
                 let sample_table = &sample_table;
+
+                let thread_start = &thread_start;
+                let thread_items = &thread_items;
                 s.spawn(move || {
-                    let thread_range_start = thread_idx * thread_items;
-                    let thread_range_end = sample_table.rows().min((thread_idx + 1) * thread_items);
+                    let thread_range_start = thread_start[thread_idx];
+                    let thread_range_end = thread_range_start + thread_items[thread_idx];
+
                     let thread_data = &neighbors[thread_range_start..thread_range_end];
 
                     let mut output_data = Vec::new();
@@ -327,7 +338,6 @@ impl SampleAugmentationArgs {
             };
             output().unwrap();
         });
-        println!("{}", (Instant::now() - now).as_millis());
 
         Ok(())
     }
