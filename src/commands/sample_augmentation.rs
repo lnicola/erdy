@@ -189,7 +189,7 @@ impl SampleAugmentationArgs {
         for (idx, field) in layer_defn.fields().enumerate() {
             let name = field.name();
             if !self.exclude.contains(&name) && name != self.field {
-                included_fields.push((idx, name));
+                included_fields.push((idx, name, field.field_type()));
             }
         }
 
@@ -197,7 +197,7 @@ impl SampleAugmentationArgs {
         layer.set_attribute_filter(&attribute_filter)?;
         let mut data = Vec::new();
         for feature in layer.features() {
-            for &(idx, _) in &included_fields {
+            for &(idx, _, _) in &included_fields {
                 let value = feature.field_as_double(idx as i32)?.unwrap();
                 data.push(value);
             }
@@ -316,8 +316,8 @@ impl SampleAugmentationArgs {
                     ty: wkbNone,
                     options: None,
                 })?;
-                for (_, name) in &included_fields {
-                    let field_defn = FieldDefn::new(name, OGRFieldType::OFTReal)?;
+                for (_, name, field_type) in &included_fields {
+                    let field_defn = FieldDefn::new(name, *field_type)?;
                     field_defn.add_to_layer(&layer)?;
                 }
 
@@ -326,7 +326,18 @@ impl SampleAugmentationArgs {
                     let layer = tx.layer(0)?;
                     for idx in 0..batch.rows() {
                         let mut feature = Feature::new(layer.defn())?;
-                        for (col_idx, value) in batch.sample(idx).iter().copied().enumerate() {
+                        for (col_idx, (mut value, &(_, _, field_type))) in batch
+                            .sample(idx)
+                            .iter()
+                            .copied()
+                            .zip(&included_fields)
+                            .enumerate()
+                        {
+                            if field_type == OGRFieldType::OFTInteger
+                                || field_type == OGRFieldType::OFTInteger64
+                            {
+                                value = value.round_ties_even();
+                            }
                             feature.set_field_double_by_index(col_idx, value);
                         }
                         feature.create(&layer)?;
