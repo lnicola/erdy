@@ -50,6 +50,10 @@ pub struct SampleAugmentationArgs {
     /// Number of threads to use
     #[arg(long)]
     num_threads: Option<usize>,
+
+    /// Normalize features
+    #[arg(long, default_value_t = false)]
+    normalize: bool,
 }
 
 struct SampleTable<T> {
@@ -204,6 +208,28 @@ impl SampleAugmentationArgs {
         }
 
         let columns = included_fields.len();
+
+        let mut column_max = vec![f64::NEG_INFINITY; columns];
+        let mut column_min = vec![f64::INFINITY; columns];
+
+        if self.normalize {
+            for (idx, value) in data.iter().copied().enumerate() {
+                let col = idx % columns;
+                column_max[col] = column_max[col].max(value);
+                column_min[col] = column_min[col].min(value);
+            }
+
+            for (idx, value) in data.iter_mut().enumerate() {
+                let col = idx % columns;
+                let d = column_max[col] - column_min[col];
+                if d != 0.0 {
+                    *value = (*value - column_min[col]) / d;
+                } else {
+                    *value = 0.0;
+                }
+            }
+        }
+
         let sample_table = Arc::new(SampleTable::new(columns, data));
 
         let samples = (0..sample_table.rows())
@@ -333,10 +359,15 @@ impl SampleAugmentationArgs {
                             .zip(&included_fields)
                             .enumerate()
                         {
-                            if field_type == OGRFieldType::OFTInteger
-                                || field_type == OGRFieldType::OFTInteger64
-                            {
-                                value = value.round_ties_even();
+                            if self.normalize {
+                                let d = column_max[col_idx] - column_min[col_idx];
+                                value = value * d + column_min[col_idx];
+
+                                if field_type == OGRFieldType::OFTInteger
+                                    || field_type == OGRFieldType::OFTInteger64
+                                {
+                                    value = value.round_ties_even();
+                                }
                             }
                             feature.set_field_double_by_index(col_idx, value);
                         }
