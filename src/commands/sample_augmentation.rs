@@ -248,15 +248,13 @@ impl SampleAugmentationArgs {
         let mut rng = rand::thread_rng();
 
         let t = self.samples / sample_table.rows();
-        let mut neighbors = (0..sample_table.rows())
-            .map(|_| (t, SmallRng::from_rng(&mut rng).unwrap()))
-            .collect::<Vec<_>>();
+        let mut neighbors = vec![t; sample_table.rows()];
         let mut indices = (0..sample_table.rows()).collect::<Vec<_>>();
         let extra_indices = indices
             .partial_shuffle(&mut rng, self.samples % sample_table.rows())
             .0;
         for idx in extra_indices {
-            neighbors[*idx].0 += 1;
+            neighbors[*idx] += 1;
         }
 
         let mut num_threads = self.num_threads.filter(|&t| t > 0).unwrap_or_else(|| {
@@ -294,6 +292,7 @@ impl SampleAugmentationArgs {
 
                 let thread_start = &thread_start;
                 let thread_items = &thread_items;
+                let mut rng = SmallRng::from_rng(&mut rng).expect("can't create SmallRng");
                 s.spawn(move || {
                     let thread_range_start = thread_start[thread_idx];
                     let thread_range_end = thread_range_start + thread_items[thread_idx];
@@ -302,11 +301,10 @@ impl SampleAugmentationArgs {
 
                     let mut output_data = Vec::new();
                     let mut tmp = vec![0.0; sample_table.columns()];
-                    for ((count, rng), sample_idx) in
+                    for (count, sample_idx) in
                         thread_data.iter().zip(thread_range_start..thread_range_end)
                     {
                         let sample = Sample::from_ref(sample_table.clone(), sample_idx);
-                        let mut rng = rng.clone();
                         for _ in 0..*count {
                             let idx = rng.gen_range(0..k_nearest_neighbors);
                             let neighbor = query.nn(&sample).nth(idx + 1).unwrap();
