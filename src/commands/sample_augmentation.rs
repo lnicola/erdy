@@ -236,6 +236,10 @@ impl SampleAugmentationArgs {
             .map(|idx| Sample::from_ref(sample_table.clone(), idx))
             .collect::<Vec<_>>();
 
+        if samples.len() == 1 {
+            panic!("can't run sample augmentation on a single input sample");
+        }
+
         let k_nearest_neighbors = self.neighbors.min(samples.len() - 1);
         let values = vec![(); samples.len()];
 
