@@ -5,7 +5,7 @@ use std::{
     path::PathBuf,
     sync::{
         mpsc::{self, SyncSender},
-        Arc,
+        Arc, Mutex,
     },
     thread::{self, available_parallelism},
 };
@@ -331,6 +331,7 @@ impl SampleExtractionArgs {
         }
 
         let mut output_txs = Vec::with_capacity(self.points.len());
+        let mutex = Arc::new(Mutex::new(()));
         thread::scope(|scope| -> Result<()> {
             let mut output_threads = Vec::with_capacity(self.points.len());
             for (path, layer_name, spatial_ref, layer_fields) in self
@@ -345,6 +346,7 @@ impl SampleExtractionArgs {
                     mpsc::sync_channel::<(Arc<(Vec<BandValue>, BlockPoints)>, Range<usize>)>(128);
                 output_txs.push(tx);
 
+                let mutex = mutex.clone();
                 let thread = scope.spawn(move || {
                     let mut output = DriverManager::get_driver_by_name(&self.format)?
                         .create_vector_only(path)?;
@@ -429,7 +431,10 @@ impl SampleExtractionArgs {
                         }
                         tx.commit()?;
                     }
-                    output.close()?;
+                    {
+                        let _guard = mutex.lock();
+                        output.close()?;
+                    }
                     Ok::<_, gdal::errors::GdalError>(())
                 });
                 output_threads.push(thread);
