@@ -15,7 +15,11 @@ use gdal::{
 };
 use gdal_sys::{OGRFieldType, OGRwkbGeometryType::wkbNone};
 use num_traits::{real::Real, AsPrimitive, Zero};
-use rand::{rngs::SmallRng, seq::SliceRandom, Rng, SeedableRng};
+use rand::{
+    rngs::{SmallRng, StdRng},
+    seq::SliceRandom,
+    Rng, SeedableRng,
+};
 
 use crate::gdal_ext::FeatureExt;
 
@@ -245,7 +249,7 @@ impl SampleAugmentationArgs {
 
         let ball_tree = BallTree::new(samples.clone(), values);
 
-        let mut rng = rand::thread_rng();
+        let mut rng = StdRng::from_entropy();
 
         let t = self.samples / sample_table.rows();
         let mut neighbors = vec![t; sample_table.rows()];

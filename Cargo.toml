@@ -18,7 +18,7 @@ gdal-sys = "0.10"
 # gdal-sys = { version = "0.10", git = "https://github.com/georust/gdal" }
 indicatif = "0.17"
 num-traits = "0.2"
-rand = { version = "0.8.5", features = ["small_rng"] }
+rand = { version = "0.8.5", default-features = false, features = ["small_rng", "std", "std_rng"] }
 tempfile = "3.12"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "ansi", "smallvec"] }
