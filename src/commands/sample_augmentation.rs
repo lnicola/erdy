@@ -11,7 +11,7 @@ use ball_tree::{BallTree, Point};
 use clap::Parser;
 use gdal::{
     vector::{Feature, FieldDefn, LayerAccess, LayerOptions},
-    Dataset, DriverManager,
+    Dataset, DriverManager, DriverType,
 };
 use gdal_sys::{OGRFieldType, OGRwkbGeometryType::wkbNone};
 use num_traits::{real::Real, AsPrimitive, Zero};
@@ -339,7 +339,11 @@ impl SampleAugmentationArgs {
 
             // TODO: add_to_layer error
             let output = || -> anyhow::Result<()> {
-                let driver = DriverManager::get_driver_by_name("SQLite")?;
+                let driver = DriverManager::get_output_driver_for_dataset_name(
+                    &self.output,
+                    DriverType::Vector,
+                )
+                .expect("can't determine output driver");
                 let mut output_dataset = driver.create_vector_only(&self.output)?;
 
                 let layer = output_dataset.create_layer(LayerOptions {
