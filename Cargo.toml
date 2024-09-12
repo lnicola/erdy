@@ -12,6 +12,7 @@ description = "TBD"
 anyhow = "1.0"
 ball-tree = "0.5"
 clap = { version = "4.5", features = ["derive"] }
+faster-hex = "0.9"
 gdal = { version = "0.17" }
 gdal-sys = "0.10"
 # gdal = { version = "0.17", git = "https://github.com/georust/gdal" }

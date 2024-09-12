@@ -58,6 +58,9 @@ pub struct SampleAugmentationArgs {
     /// Normalize features
     #[arg(long, default_value_t = false)]
     normalize: bool,
+
+    #[arg(long)]
+    random_seed: Option<String>,
 }
 
 struct SampleTable<T> {
@@ -249,7 +252,13 @@ impl SampleAugmentationArgs {
 
         let ball_tree = BallTree::new(samples.clone(), values);
 
-        let mut rng = StdRng::from_entropy();
+        let mut rng = if let Some(seed) = &self.random_seed {
+            let mut seed_buf = <StdRng as SeedableRng>::Seed::default();
+            faster_hex::hex_decode(seed.as_bytes(), &mut seed_buf)?;
+            StdRng::from_seed(seed_buf)
+        } else {
+            StdRng::from_entropy()
+        };
 
         let t = self.samples / sample_table.rows();
         let mut neighbors = vec![t; sample_table.rows()];
