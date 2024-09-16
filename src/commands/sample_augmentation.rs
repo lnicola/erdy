@@ -1,7 +1,7 @@
 use std::{
     mem,
     num::NonZeroUsize,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{self, Arc},
     thread,
 };
@@ -20,16 +20,22 @@ use rand::{
     seq::SliceRandom,
     Rng, SeedableRng,
 };
+use rayon::iter::{IntoParallelIterator as _, ParallelIterator};
 
 use crate::gdal_ext::FeatureExt;
 
 #[derive(Debug, Parser)]
 pub struct SampleAugmentationArgs {
-    /// Input dataset
-    input: PathBuf,
+    /// Input datasets
+    #[arg(long, value_parser, num_args = 1..)]
+    inputs: Vec<PathBuf>,
 
     /// Output dataset
     output: PathBuf,
+
+    /// Output layer name
+    #[arg(long)]
+    layer_name: Option<String>,
 
     /// Class field
     #[arg(long)]
@@ -189,11 +195,33 @@ where
     }
 }
 
+fn load_samples(
+    path: &Path,
+    included_fields: &[(usize, String, u32)],
+    attribute_filter: &str,
+) -> Result<Vec<f64>> {
+    let dataset = Dataset::open(path)?;
+    let mut layer = dataset.layer(0)?;
+    layer.set_attribute_filter(attribute_filter)?;
+    let mut data = Vec::new();
+    for feature in layer.features() {
+        for &(idx, _, _) in included_fields {
+            let value = feature.field_as_double(idx as i32)?.unwrap();
+            data.push(value);
+        }
+    }
+    Ok(data)
+}
+
 impl SampleAugmentationArgs {
     pub fn run(&self) -> Result<()> {
-        let input_dataset = Dataset::open(&self.input)?;
-        let mut layer = input_dataset.layer(0)?;
-        let input_layer_name = layer.name();
+        let input_dataset = Dataset::open(&self.inputs[0])?;
+        let layer = input_dataset.layer(0)?;
+        let layer_name = self
+            .layer_name
+            .as_ref()
+            .map(|n| n.to_string())
+            .unwrap_or_else(|| layer.name());
 
         let layer_defn = layer.defn();
         let mut included_fields = Vec::new();
@@ -203,18 +231,18 @@ impl SampleAugmentationArgs {
                 included_fields.push((idx, name, field.field_type()));
             }
         }
+        let columns = included_fields.len();
 
         let attribute_filter = format!("{}={}", self.field, self.label);
-        layer.set_attribute_filter(&attribute_filter)?;
         let mut data = Vec::new();
-        for feature in layer.features() {
-            for &(idx, _, _) in &included_fields {
-                let value = feature.field_as_double(idx as i32)?.unwrap();
-                data.push(value);
-            }
+        let input_data = (&self.inputs)
+            .into_par_iter()
+            .map(|input| load_samples(input, &included_fields, &attribute_filter))
+            .collect::<Vec<_>>();
+        for res in input_data {
+            let file_data = res?;
+            data.extend_from_slice(&file_data);
         }
-
-        let columns = included_fields.len();
 
         let mut column_max = vec![f64::NEG_INFINITY; columns];
         let mut column_min = vec![f64::INFINITY; columns];
@@ -356,7 +384,7 @@ impl SampleAugmentationArgs {
                 let mut output_dataset = driver.create_vector_only(&self.output)?;
 
                 let layer = output_dataset.create_layer(LayerOptions {
-                    name: &input_layer_name,
+                    name: &layer_name,
                     srs: None,
                     ty: wkbNone,
                     options: None,
