@@ -267,15 +267,21 @@ impl SampleAugmentationArgs {
 
         let sample_table = Arc::new(SampleTable::new(columns, data));
 
+        match sample_table.rows() {
+            0 => eprintln!("no input rows for sample augmentation"),
+            1 => eprintln!("can't run sample augmentation on a single input sample"),
+            _ => {}
+        }
+
         let samples = (0..sample_table.rows())
             .map(|idx| Sample::from_ref(sample_table.clone(), idx))
             .collect::<Vec<_>>();
 
-        if samples.len() == 1 {
-            panic!("can't run sample augmentation on a single input sample");
-        }
-
-        let k_nearest_neighbors = self.neighbors.min(samples.len() - 1);
+        let k_nearest_neighbors = if samples.len() > 1 {
+            self.neighbors.min(samples.len() - 1)
+        } else {
+            0
+        };
         let values = vec![(); samples.len()];
 
         let ball_tree = BallTree::new(samples.clone(), values);
@@ -288,14 +294,16 @@ impl SampleAugmentationArgs {
             StdRng::from_entropy()
         };
 
-        let t = self.samples / sample_table.rows();
+        let t = self.samples.checked_div(sample_table.rows()).unwrap_or(0);
         let mut neighbors = vec![t; sample_table.rows()];
         let mut indices = (0..sample_table.rows()).collect::<Vec<_>>();
-        let extra_indices = indices
-            .partial_shuffle(&mut rng, self.samples % sample_table.rows())
-            .0;
-        for idx in extra_indices {
-            neighbors[*idx] += 1;
+        if sample_table.rows() > 1 {
+            let extra_indices = indices
+                .partial_shuffle(&mut rng, self.samples % sample_table.rows())
+                .0;
+            for idx in extra_indices {
+                neighbors[*idx] += 1;
+            }
         }
 
         let mut num_threads = self.num_threads.filter(|&t| t > 0).unwrap_or_else(|| {
