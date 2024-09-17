@@ -224,10 +224,13 @@ impl SampleAugmentationArgs {
             .unwrap_or_else(|| layer.name());
 
         let layer_defn = layer.defn();
+        let mut attribute_field = None;
         let mut included_fields = Vec::new();
         for (idx, field) in layer_defn.fields().enumerate() {
             let name = field.name();
-            if !self.exclude.contains(&name) && name != self.field {
+            if name == self.field {
+                attribute_field = Some((idx, name, field.field_type()));
+            } else if !self.exclude.contains(&name) {
                 included_fields.push((idx, name, field.field_type()));
             }
         }
@@ -397,6 +400,14 @@ impl SampleAugmentationArgs {
                     ty: wkbNone,
                     options: None,
                 })?;
+                let offset = match attribute_field {
+                    Some((_, name, field_type)) => {
+                        let field_defn = FieldDefn::new(&name, field_type)?;
+                        field_defn.add_to_layer(&layer)?;
+                        1
+                    }
+                    None => 0,
+                };
                 for (_, name, field_type) in &included_fields {
                     let field_defn = FieldDefn::new(name, *field_type)?;
                     field_defn.add_to_layer(&layer)?;
@@ -407,6 +418,9 @@ impl SampleAugmentationArgs {
                     let layer = tx.layer(0)?;
                     for idx in 0..batch.rows() {
                         let mut feature = Feature::new(layer.defn())?;
+                        if offset == 1 {
+                            feature.set_field_integer64_by_index(0, self.label);
+                        }
                         for (col_idx, (mut value, &(_, _, field_type))) in batch
                             .sample(idx)
                             .iter()
@@ -424,7 +438,7 @@ impl SampleAugmentationArgs {
                             {
                                 value = value.round_ties_even();
                             }
-                            feature.set_field_double_by_index(col_idx, value);
+                            feature.set_field_double_by_index(offset + col_idx, value);
                         }
                         feature.create(&layer)?;
                     }
