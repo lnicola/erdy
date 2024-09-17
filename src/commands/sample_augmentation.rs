@@ -417,12 +417,12 @@ impl SampleAugmentationArgs {
                             if self.normalize {
                                 let d = column_max[col_idx] - column_min[col_idx];
                                 value = value * d + column_min[col_idx];
+                            }
 
-                                if field_type == OGRFieldType::OFTInteger
-                                    || field_type == OGRFieldType::OFTInteger64
-                                {
-                                    value = value.round_ties_even();
-                                }
+                            if field_type == OGRFieldType::OFTInteger
+                                || field_type == OGRFieldType::OFTInteger64
+                            {
+                                value = value.round_ties_even();
                             }
                             feature.set_field_double_by_index(col_idx, value);
                         }
