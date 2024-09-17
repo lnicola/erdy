@@ -13,7 +13,7 @@ use gdal::{
     vector::{Feature, FieldDefn, LayerAccess, LayerOptions},
     Dataset, DriverManager, DriverType,
 };
-use gdal_sys::{OGRFieldType, OGRwkbGeometryType::wkbNone};
+use gdal_sys::{OGRFieldType, OGRwkbGeometryType::wkbPoint};
 use num_traits::{real::Real, AsPrimitive, Zero};
 use rand::{
     rngs::{SmallRng, StdRng},
@@ -397,7 +397,7 @@ impl SampleAugmentationArgs {
                 let layer = output_dataset.create_layer(LayerOptions {
                     name: &layer_name,
                     srs: None,
-                    ty: wkbNone,
+                    ty: wkbPoint,
                     options: None,
                 })?;
                 let offset = match attribute_field {
