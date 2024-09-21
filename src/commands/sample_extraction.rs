@@ -181,6 +181,7 @@ impl BlockReducer for SamplingBlockReducer {
     }
 }
 
+#[allow(clippy::type_complexity)]
 #[derive(Clone)]
 struct BlockSender(Vec<SyncSender<(Arc<(Vec<BandValue>, BlockPoints)>, Range<usize>)>>);
 
