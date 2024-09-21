@@ -111,50 +111,49 @@ impl BandSelectArgs {
                     })
                     .collect::<Result<Vec<_>, _>>()?;
 
-                match mask_block {
-                    TypedBuffer::U8(mask_block) => {
-                        if input_blocks.iter().all(|(_, block)| block.is_i16()) {
-                            let input_blocks = input_blocks
-                                .into_iter()
-                                .map(|(label, block)| (label, block.try_into_i16().unwrap()))
-                                .collect::<Vec<_>>();
-                            let mut input_iterators = input_blocks
-                                .into_iter()
-                                .map(|(label, input)| (label, input.into_iter()))
-                                .collect::<Vec<_>>();
+                let mask_iterator: &mut dyn Iterator<Item = usize> = match mask_block {
+                    TypedBuffer::U8(buffer) => &mut buffer.into_iter().map(|x| x as usize),
+                    TypedBuffer::I8(buffer) => &mut buffer.into_iter().map(|x| x as usize),
+                    TypedBuffer::U16(buffer) => &mut buffer.into_iter().map(|x| x as usize),
+                    TypedBuffer::I16(buffer) => &mut buffer.into_iter().map(|x| x as usize),
+                    TypedBuffer::U32(buffer) => &mut buffer.into_iter().map(|x| x as usize),
+                    TypedBuffer::I32(buffer) => &mut buffer.into_iter().map(|x| x as usize),
+                    TypedBuffer::U64(buffer) => &mut buffer.into_iter().map(|x| x as usize),
+                    TypedBuffer::I64(buffer) => &mut buffer.into_iter().map(|x| x as usize),
+                    TypedBuffer::F32(buffer) => &mut buffer.into_iter().map(|x| x as usize),
+                    TypedBuffer::F64(buffer) => &mut buffer.into_iter().map(|x| x as usize),
+                };
+                if input_blocks.iter().all(|(_, block)| block.is_i16()) {
+                    let input_blocks = input_blocks
+                        .into_iter()
+                        .map(|(label, block)| (label, block.try_into_i16().unwrap()))
+                        .collect::<Vec<_>>();
+                    let mut input_iterators = input_blocks
+                        .into_iter()
+                        .map(|(label, input)| (label, input.into_iter()))
+                        .collect::<Vec<_>>();
 
-                            let mut output_block =
-                                Buffer::new(block_shape, vec![0; block_shape.0 * block_shape.1]);
-                            for (out_pixel, mask_pixel) in
-                                output_block.data_mut().iter_mut().zip(mask_block)
-                            {
-                                let mut found = false;
-                                for (label, it) in input_iterators.iter_mut() {
-                                    if *label == mask_pixel as usize {
-                                        found = true;
-                                        *out_pixel = it.next().unwrap();
-                                    } else {
-                                        it.next().unwrap();
-                                    }
-                                }
-                                if !found {
-                                    *out_pixel = 0;
-                                }
+                    let mut output_block =
+                        Buffer::new(block_shape, vec![0; block_shape.0 * block_shape.1]);
+                    for (out_pixel, mask_pixel) in
+                        output_block.data_mut().iter_mut().zip(mask_iterator)
+                    {
+                        let mut found = false;
+                        for (label, it) in input_iterators.iter_mut() {
+                            if *label == mask_pixel {
+                                found = true;
+                                *out_pixel = it.next().unwrap();
+                            } else {
+                                it.next().unwrap();
                             }
-                            output_band.write_block((x, y), &mut output_block)?;
-                        } else {
-                            unimplemented!();
+                        }
+                        if !found {
+                            *out_pixel = 0;
                         }
                     }
-                    TypedBuffer::I8(_) => unimplemented!(),
-                    TypedBuffer::U16(_) => unimplemented!(),
-                    TypedBuffer::I16(_) => unimplemented!(),
-                    TypedBuffer::U32(_) => unimplemented!(),
-                    TypedBuffer::I32(_) => unimplemented!(),
-                    TypedBuffer::U64(_) => unimplemented!(),
-                    TypedBuffer::I64(_) => unimplemented!(),
-                    TypedBuffer::F32(_) => unimplemented!(),
-                    TypedBuffer::F64(_) => unimplemented!(),
+                    output_band.write_block((x, y), &mut output_block)?;
+                } else {
+                    unimplemented!();
                 }
             }
         }
