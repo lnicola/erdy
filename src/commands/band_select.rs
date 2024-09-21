@@ -153,7 +153,7 @@ impl BandSelectArgs {
                     }
                     output_band.write_block((x, y), &mut output_block)?;
                 } else {
-                    unimplemented!();
+                    unimplemented!("only `UInt16` inputs are currently supported");
                 }
             }
         }
