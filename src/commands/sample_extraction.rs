@@ -284,7 +284,6 @@ impl SampleExtractionArgs {
             let layer_name = layer.name();
             layer_names.push(layer_name);
 
-            dbg!(layer.feature_count());
             for feature in layer.features() {
                 if let Some(geometry) = feature.geometry().as_ref() {
                     let (orig_x, orig_y, _) = geometry.get_point(0);
