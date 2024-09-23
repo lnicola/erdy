@@ -26,5 +26,6 @@ fn main() -> Result<()> {
         Command::BuildVrt(args) => args.run(),
         Command::SampleExtraction(args) => args.run(),
         Command::SampleAugmentation(args) => args.run(),
+        Command::SampleSelection(mut args) => args.run(),
     }
 }

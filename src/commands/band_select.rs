@@ -8,7 +8,7 @@ use gdal::{
 };
 use num_traits::NumCast;
 
-use crate::gdal_ext::{RasterBandExt, TypedBuffer};
+use crate::gdal_ext::{RasterBandExt as _, TypedBuffer};
 
 #[derive(Debug, Parser)]
 pub struct BandSelectArgs {
