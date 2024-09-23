@@ -20,7 +20,7 @@ use gdal::{
         Feature, FieldDefn, FieldValue, Geometry, LayerAccess, LayerOptions, OGRFieldType,
         OGRwkbGeometryType,
     },
-    Dataset, DriverManager, GeoTransformEx, Metadata,
+    Dataset, DriverManager, DriverType, GeoTransformEx, Metadata,
 };
 
 use crate::{
@@ -43,7 +43,7 @@ pub struct SampleExtractionArgs {
 
     /// Output format
     #[arg(short, long)]
-    format: String,
+    format: Option<String>,
 
     /// Output field names
     #[arg(long, value_parser, num_args = 1..)]
@@ -349,8 +349,15 @@ impl SampleExtractionArgs {
 
                 let mutex = mutex.clone();
                 let thread = scope.spawn(move || {
-                    let mut output = DriverManager::get_driver_by_name(&self.format)?
-                        .create_vector_only(path)?;
+                    let driver = match self.format {
+                        Some(ref format) => DriverManager::get_driver_by_name(format)?,
+                        None => DriverManager::get_output_driver_for_dataset_name(
+                            path,
+                            DriverType::Vector,
+                        )
+                        .expect("can't determine output driver"),
+                    };
+                    let mut output = driver.create_vector_only(path)?;
                     let output_layer = output.create_layer(LayerOptions {
                         name: &layer_name,
                         srs: spatial_ref
