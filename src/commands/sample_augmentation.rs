@@ -271,8 +271,8 @@ impl SampleAugmentationArgs {
         let sample_table = Arc::new(SampleTable::new(columns, data));
 
         match sample_table.rows() {
-            0 => eprintln!("no input rows for sample augmentation"),
-            1 => eprintln!("can't run sample augmentation on a single input sample"),
+            0 => anyhow::bail!("no input rows for sample augmentation"),
+            1 => anyhow::bail!("can't run sample augmentation on a single input sample"),
             _ => {}
         }
 
