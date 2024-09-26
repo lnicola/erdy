@@ -1,18 +1,19 @@
 FROM ghcr.io/osgeo/gdal:ubuntu-full-3.9.2
 RUN apt-get update -y
-RUN apt-get install -y binutils curl pkg-config gcc
-WORKDIR /app
+RUN apt-get install -y --no-install-recommends gcc libc-dev pkg-config
 RUN --mount=type=cache,target=/root/.cargo \
     --mount=type=cache,target=/root/.rustup \
-    curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused -fsSL "https://sh.rustup.rs" | sh -s -- --profile minimal --default-toolchain stable --component rust-src -y
+    curl --tlsv1.2 -fsS "https://sh.rustup.rs" | sh -s -- --default-toolchain nightly --profile minimal -y
+
+WORKDIR /app
+COPY Cargo.toml Cargo.lock .
+COPY src src
+
 RUN --mount=type=cache,target=/root/.cargo \
     --mount=type=cache,target=/root/.rustup \
     --mount=type=cache,target=/app/target/release/build \
     --mount=type=cache,target=/app/target/release/deps \
     --mount=type=cache,target=/app/target/release/.fingerprint \
-    --mount=type=bind,source=Cargo.toml,target=/app/Cargo.toml \
-    --mount=type=bind,source=Cargo.lock,target=/app/Cargo.lock \
-    --mount=type=bind,source=src,target=/app/src \
     ~/.cargo/bin/cargo build --release
 
 FROM ghcr.io/osgeo/gdal:ubuntu-full-3.9.2
