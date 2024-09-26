@@ -12,16 +12,14 @@ description = "TBD"
 anyhow = "1.0"
 ball-tree = "0.5"
 clap = { version = "4.5", features = ["derive"] }
-faster-hex = "0.9"
-gdal = { version = "0.17" }
+faster-hex = "0.10"
+gdal = "0.17"
 gdal-sys = "0.10"
-# gdal = { version = "0.17", git = "https://github.com/georust/gdal" }
-# gdal-sys = { version = "0.10", git = "https://github.com/georust/gdal" }
 indicatif = "0.17"
 num-traits = "0.2"
-quick-xml = "0.36.1"
-rand = { version = "0.8.5", default-features = false, features = ["small_rng", "std", "std_rng"] }
-rayon = "1.10.0"
+quick-xml = "0.36"
+rand = { version = "0.8", default-features = false, features = ["small_rng", "std", "std_rng"] }
+rayon = "1.10"
 tempfile = "3.12"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "ansi", "smallvec"] }
