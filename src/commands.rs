@@ -1,6 +1,7 @@
 mod band_select;
 mod batch_translate;
 mod build_vrt;
+mod compute_confusion_matrix;
 mod sample_augmentation;
 mod sample_extraction;
 mod sample_selection;
@@ -10,6 +11,7 @@ use clap::Subcommand;
 pub use band_select::BandSelectArgs;
 pub use batch_translate::BatchTranslateArgs;
 pub use build_vrt::BuildVrtArgs;
+pub use compute_confusion_matrix::ComputeConfusionMatrixArgs;
 pub use sample_extraction::SampleExtractionArgs;
 pub use sample_selection::SampleSelectionArgs;
 
@@ -23,6 +25,8 @@ pub enum Command {
     BatchTranslate(BatchTranslateArgs),
     /// Builds a VRT.
     BuildVrt(BuildVrtArgs),
+    /// Compute the confusion matrix for a vector dataset
+    ComputeConfusionMatrix(ComputeConfusionMatrixArgs),
     /// Sample an image at given positions and output a table of the band values.
     SampleExtraction(SampleExtractionArgs),
     /// Augment a vector dataset.

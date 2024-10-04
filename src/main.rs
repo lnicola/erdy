@@ -24,6 +24,7 @@ fn main() -> Result<()> {
         Command::BandSelect(args) => args.run(),
         Command::BatchTranslate(args) => args.run(),
         Command::BuildVrt(args) => args.run(),
+        Command::ComputeConfusionMatrix(args) => args.run(),
         Command::SampleExtraction(args) => args.run(),
         Command::SampleAugmentation(args) => args.run(),
         Command::SampleSelection(mut args) => args.run(),
