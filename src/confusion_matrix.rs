@@ -25,27 +25,27 @@ impl Statistics {
 
         writeln!(&mut writer, "{{")?;
         write!(&mut writer, r#"  "labels": "#)?;
-        write_array_compact(&mut writer, &self.labels)?;
+        write_array_compact_int(&mut writer, &self.labels)?;
         writeln!(&mut writer, ",")?;
         write!(&mut writer, r#"  "confusion_matrix": ["#)?;
         for (row, values) in self.confusion_matrix.iter().enumerate() {
             if row > 0 {
                 write!(&mut writer, "                       ")?;
             }
-            write_array_compact(&mut writer, values)?;
+            write_array_compact_int(&mut writer, values)?;
             if row + 1 < self.confusion_matrix.len() {
                 writeln!(&mut writer, ",")?;
             }
         }
         writeln!(&mut writer, "],")?;
         write!(&mut writer, r#"  "class_recall": "#)?;
-        write_array_compact(&mut writer, &derived_statistics.class_recall)?;
+        write_array_compact_f64(&mut writer, &derived_statistics.class_recall)?;
         writeln!(&mut writer, ",")?;
         write!(&mut writer, r#"  "class_precision": "#)?;
-        write_array_compact(&mut writer, &derived_statistics.class_precision)?;
+        write_array_compact_f64(&mut writer, &derived_statistics.class_precision)?;
         writeln!(&mut writer, ",")?;
         write!(&mut writer, r#"  "class_f_score": "#)?;
-        write_array_compact(&mut writer, &derived_statistics.class_f_score)?;
+        write_array_compact_f64(&mut writer, &derived_statistics.class_f_score)?;
         writeln!(&mut writer, ",")?;
         write!(&mut writer, r#"  "kappa": "#)?;
         write!(&mut writer, "{}", derived_statistics.kappa)?;
@@ -104,10 +104,26 @@ impl Statistics {
     }
 }
 
-fn write_array_compact<W: Write, T: Display>(mut writer: W, array: &[T]) -> io::Result<()> {
+fn write_array_compact_int<W: Write, T: Display>(mut writer: W, array: &[T]) -> io::Result<()> {
     write!(&mut writer, "[")?;
     for (idx, value) in array.iter().enumerate() {
         write!(&mut writer, "{value}")?;
+        if idx + 1 < array.len() {
+            write!(&mut writer, ", ")?;
+        }
+    }
+    write!(&mut writer, "]")
+}
+
+fn write_array_compact_f64<W: Write>(mut writer: W, array: &[f64]) -> io::Result<()> {
+    write!(&mut writer, "[")?;
+    for (idx, value) in array.iter().enumerate() {
+        if value.is_nan() {
+            write!(&mut writer, "null")?;
+        } else {
+            write!(&mut writer, "{value}")?;
+        }
+
         if idx + 1 < array.len() {
             write!(&mut writer, ", ")?;
         }
