@@ -36,6 +36,9 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
 ] }
 walkdir = "2.5"
 
+[dev-dependencies]
+approx_eq = "0.1.8"
+
 [package.metadata.generate-rpm]
 assets = [
     { source = "target/release/erdy", dest = "/usr/bin/erdy", mode = "755" },

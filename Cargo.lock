@@ -76,6 +76,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "approx_eq"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3f9eb837c6a783fbf002e3e5cc7925a3aa6893d6d42f9169517528983777590"
+
+[[package]]
 name = "autocfg"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -215,6 +221,7 @@ name = "erdy"
 version = "0.2.3"
 dependencies = [
  "anyhow",
+ "approx_eq",
  "ball-tree",
  "clap",
  "faster-hex",
