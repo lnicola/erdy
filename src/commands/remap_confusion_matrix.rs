@@ -47,7 +47,7 @@ impl RemapConfusionMatrixArgs {
             .copied()
             .map(|l| remapping_set.get(&l).copied().unwrap_or(l))
             .collect::<Vec<_>>();
-        remapped_labels.sort_unstable_by_key(|l| l.to_string());
+        remapped_labels.sort_unstable();
         remapped_labels.dedup();
         let remapped_label_map = remapped_labels
             .iter()
