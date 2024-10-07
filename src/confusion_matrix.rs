@@ -70,7 +70,7 @@ impl Statistics {
 
         for (idx, row_sum) in row_sums.iter().copied().enumerate() {
             let val = self.confusion_matrix[idx][idx] as f64;
-            class_recall.push(val as f64 / row_sum as f64);
+            class_recall.push(val / row_sum as f64);
 
             p_o += val;
             samples += row_sum;
