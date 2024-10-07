@@ -2,6 +2,7 @@ use std::{
     fs::File,
     io::BufWriter,
     path::{Path, PathBuf},
+    sync::Mutex,
 };
 
 use anyhow::Result;
@@ -32,10 +33,12 @@ pub struct ComputeConfusionMatrixArgs {
 
 impl ComputeConfusionMatrixArgs {
     pub fn run(&self) -> Result<()> {
+        let close_mutex = Mutex::new(());
+
         let builders = self
             .inputs
             .par_iter()
-            .map(|p| process_file(p, &self.reference, &self.prediction))
+            .map(|p| process_file(p, &self.reference, &self.prediction, &close_mutex))
             .collect::<Result<Vec<_>>>()?;
 
         let confusion_matrix_builder =
@@ -56,7 +59,12 @@ impl ComputeConfusionMatrixArgs {
     }
 }
 
-fn process_file(path: &Path, reference: &str, prediction: &str) -> Result<ConfusionMatrixBuilder> {
+fn process_file(
+    path: &Path,
+    reference: &str,
+    prediction: &str,
+    close_mutex: &Mutex<()>,
+) -> Result<ConfusionMatrixBuilder> {
     let dataset = Dataset::open(path)?;
     let mut layer = dataset.layer(0)?;
     let defn = layer.defn();
@@ -74,6 +82,11 @@ fn process_file(path: &Path, reference: &str, prediction: &str) -> Result<Confus
         let reference = u16::try_from(reference)?;
         let prediction = u16::try_from(prediction)?;
         matrix_builder.add_sample(reference, prediction);
+    }
+
+    {
+        let _lock = close_mutex.lock();
+        drop(dataset);
     }
 
     Ok(matrix_builder)
