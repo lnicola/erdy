@@ -45,7 +45,7 @@ impl BatchTranslateArgs {
 
         for entry in rx {
             struct ProgressGuard<'a>(&'a ProgressBar);
-            impl<'a> Drop for ProgressGuard<'a> {
+            impl Drop for ProgressGuard<'_> {
                 fn drop(&mut self) {
                     self.0.inc(1);
                 }

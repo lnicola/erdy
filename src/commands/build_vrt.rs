@@ -78,7 +78,7 @@ impl BuildVrtArgs {
             }
         }
 
-        impl<'a, W: Write> VrtBandWriter<'a, W> {
+        impl<W: Write> VrtBandWriter<'_, W> {
             fn write_band(&mut self, path: &Path, resolution: usize) -> quick_xml::Result<()> {
                 let source_size = (10980 * 10 / resolution).to_string();
                 self.writer

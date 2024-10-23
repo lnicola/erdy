@@ -291,7 +291,7 @@ pub trait RasterBandExt {
     fn read_typed_block(&self, x: usize, y: usize) -> errors::Result<TypedBuffer>;
 }
 
-impl<'d> RasterBandExt for RasterBand<'d> {
+impl RasterBandExt for RasterBand<'_> {
     fn read_typed_block(&self, x: usize, y: usize) -> errors::Result<TypedBuffer> {
         match self.band_type() {
             GdalDataType::Unknown => unimplemented!(),

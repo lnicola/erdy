@@ -70,8 +70,8 @@ impl BandSelectArgs {
         let mut output_band = output.rasterband(1)?;
 
         let (blocks_x, blocks_y) = (
-            (raster_size.0 + block_size.0 - 1) / block_size.0,
-            (raster_size.1 + block_size.1 - 1) / block_size.1,
+            raster_size.0.div_ceil(block_size.0),
+            raster_size.1.div_ceil(block_size.1),
         );
 
         for y in 0..blocks_y {
