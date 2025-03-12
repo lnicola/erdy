@@ -13,10 +13,12 @@ anyhow = "1.0"
 ball-tree = "0.5"
 clap = { version = "4.5", features = ["derive"] }
 faster-hex = "0.10"
+flume = "0.11.0"
 gdal = "0.17"
 gdal-sys = "0.10"
 indicatif = "0.17"
 num-traits = "0.2"
+parking_lot = "0.12.3"
 quick-xml = "0.36"
 rand = { version = "0.8", default-features = false, features = [
     "small_rng",
@@ -38,6 +40,9 @@ walkdir = "2.5"
 
 [dev-dependencies]
 approx_eq = "0.1.8"
+
+[features]
+bindgen = ["gdal/bindgen"]
 
 [package.metadata.generate-rpm]
 assets = [

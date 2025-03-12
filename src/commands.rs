@@ -6,6 +6,7 @@ mod remap_confusion_matrix;
 mod sample_augmentation;
 mod sample_extraction;
 mod sample_selection;
+mod temporal_resampling;
 
 use clap::Subcommand;
 
@@ -14,10 +15,10 @@ pub use batch_translate::BatchTranslateArgs;
 pub use build_vrt::BuildVrtArgs;
 pub use compute_confusion_matrix::ComputeConfusionMatrixArgs;
 pub use remap_confusion_matrix::RemapConfusionMatrixArgs;
+pub use sample_augmentation::SampleAugmentationArgs;
 pub use sample_extraction::SampleExtractionArgs;
 pub use sample_selection::SampleSelectionArgs;
-
-use self::sample_augmentation::SampleAugmentationArgs;
+pub use temporal_resampling::TemporalResamplingArgs;
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
@@ -25,7 +26,7 @@ pub enum Command {
     BandSelect(BandSelectArgs),
     /// Translate a directory of images in batch mode.
     BatchTranslate(BatchTranslateArgs),
-    /// Builds a VRT.
+    /// Build a VRT.
     BuildVrt(BuildVrtArgs),
     /// Compute the confusion matrix for a vector dataset
     ComputeConfusionMatrix(ComputeConfusionMatrixArgs),
@@ -35,6 +36,8 @@ pub enum Command {
     SampleExtraction(SampleExtractionArgs),
     /// Augment a vector dataset.
     SampleAugmentation(SampleAugmentationArgs),
-    /// Samples labelled points from a raster.
+    /// Sample labelled points from a raster.
     SampleSelection(SampleSelectionArgs),
+    /// Gap-fill and interpolate a time series of images.
+    TemporalResampling(TemporalResamplingArgs),
 }

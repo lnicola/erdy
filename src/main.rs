@@ -30,5 +30,6 @@ fn main() -> Result<()> {
         Command::SampleExtraction(args) => args.run(),
         Command::SampleAugmentation(args) => args.run(),
         Command::SampleSelection(mut args) => args.run(),
+        Command::TemporalResampling(mut args) => args.run(),
     }
 }
