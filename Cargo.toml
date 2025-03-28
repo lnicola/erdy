@@ -20,7 +20,8 @@ indicatif = "0.17"
 num-traits = "0.2"
 parking_lot = "0.12.3"
 quick-xml = "0.36"
-rand = { version = "0.8", default-features = false, features = [
+rand = { version = "0.9", default-features = false, features = [
+    "os_rng",
     "small_rng",
     "std",
     "std_rng",

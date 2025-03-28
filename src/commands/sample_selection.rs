@@ -12,7 +12,7 @@ use gdal_sys::{
     OGRFieldType::{OFTInteger, OFTInteger64, OFTReal},
     OGRwkbGeometryType::wkbPoint,
 };
-use rand::{distributions::Uniform, prelude::Distribution, rngs::StdRng, SeedableRng};
+use rand::{distr::StandardUniform, rngs::StdRng, Rng, SeedableRng};
 
 use crate::gdal_ext::{FeatureExt, RasterBandExt as _, TypedBuffer};
 
@@ -145,7 +145,7 @@ impl SampleSelectionArgs {
             faster_hex::hex_decode(seed.as_bytes(), &mut seed_buf)?;
             StdRng::from_seed(seed_buf)
         } else {
-            StdRng::from_entropy()
+            StdRng::from_os_rng()
         };
 
         let field_type = match band.band_type() {
@@ -198,7 +198,6 @@ impl SampleSelectionArgs {
             .collect::<Vec<_>>();
 
         let mut counts = HashMap::<_, usize>::new();
-        let dist = Uniform::new(0.0, 1.0);
         for block_y in 0..blocks_y {
             for block_x in 0..blocks_x {
                 let block = band.read_typed_block(block_x, block_y)?;
@@ -230,7 +229,7 @@ impl SampleSelectionArgs {
                 for val in iterator {
                     if col < block_shape.0 && row < block_shape.1 {
                         if let Some(probability) = probabilities.get(&val) {
-                            if dist.sample(&mut rng) < *probability {
+                            if rng.sample::<f32, _>(StandardUniform) < *probability {
                                 *counts.entry(val).or_default() += 1;
 
                                 let abs_col = col + block_x * block_size.0;
@@ -248,7 +247,7 @@ impl SampleSelectionArgs {
                                 let mut point = Geometry::empty(wkbPoint)?;
                                 point.add_point_2d((mx, my));
 
-                                let t = dist.sample(&mut rng);
+                                let t = rng.sample::<f32, _>(StandardUniform);
                                 let idx = output_probabilities_csums
                                     .iter()
                                     .copied()

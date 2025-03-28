@@ -294,7 +294,7 @@ impl SampleAugmentationArgs {
             faster_hex::hex_decode(seed.as_bytes(), &mut seed_buf)?;
             StdRng::from_seed(seed_buf)
         } else {
-            StdRng::from_entropy()
+            StdRng::from_os_rng()
         };
 
         let t = self.samples.checked_div(sample_table.rows()).unwrap_or(0);
@@ -344,7 +344,7 @@ impl SampleAugmentationArgs {
 
                 let thread_start = &thread_start;
                 let thread_items = &thread_items;
-                let mut rng = SmallRng::from_rng(&mut rng).expect("can't create SmallRng");
+                let mut rng = SmallRng::from_rng(&mut rng);
                 s.spawn(move || {
                     let thread_range_start = thread_start[thread_idx];
                     let thread_range_end = thread_range_start + thread_items[thread_idx];
@@ -358,9 +358,9 @@ impl SampleAugmentationArgs {
                     {
                         let sample = Sample::from_ref(sample_table.clone(), sample_idx);
                         for _ in 0..*count {
-                            let idx = rng.gen_range(0..k_nearest_neighbors);
+                            let idx = rng.random_range(0..k_nearest_neighbors);
                             let neighbor = query.nn(&sample).nth(idx + 1).unwrap();
-                            let distance = rng.gen_range(0.0..=1.0);
+                            let distance = rng.random_range(0.0..=1.0);
                             sample.lerp(neighbor.0, distance, tmp.as_mut_slice());
 
                             for value in tmp.iter().copied() {
