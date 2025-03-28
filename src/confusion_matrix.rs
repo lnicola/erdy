@@ -15,7 +15,12 @@ pub struct Statistics {
 struct DerivedStatistics {
     class_precision: Vec<f64>,
     class_recall: Vec<f64>,
-    class_f_score: Vec<f64>,
+    class_f1_score: Vec<f64>,
+    overall_accuracy: f64,
+    balanced_accuracy: f64,
+    weighted_precision: f64,
+    weighted_recall: f64,
+    weighted_f1_score: f64,
     kappa: f64,
 }
 
@@ -44,8 +49,23 @@ impl Statistics {
         write!(&mut writer, r#"  "class_precision": "#)?;
         write_array_compact_f64(&mut writer, &derived_statistics.class_precision)?;
         writeln!(&mut writer, ",")?;
-        write!(&mut writer, r#"  "class_f_score": "#)?;
-        write_array_compact_f64(&mut writer, &derived_statistics.class_f_score)?;
+        write!(&mut writer, r#"  "class_f1_score": "#)?;
+        write_array_compact_f64(&mut writer, &derived_statistics.class_f1_score)?;
+        writeln!(&mut writer, ",")?;
+        write!(&mut writer, r#"  "overall_accuracy": "#)?;
+        write!(&mut writer, "{}", derived_statistics.overall_accuracy)?;
+        writeln!(&mut writer, ",")?;
+        write!(&mut writer, r#"  "balanced_accuracy": "#)?;
+        write!(&mut writer, "{}", derived_statistics.balanced_accuracy)?;
+        writeln!(&mut writer, ",")?;
+        write!(&mut writer, r#"  "weighted_precision": "#)?;
+        write!(&mut writer, "{}", derived_statistics.weighted_precision)?;
+        writeln!(&mut writer, ",")?;
+        write!(&mut writer, r#"  "weighted_recall": "#)?;
+        write!(&mut writer, "{}", derived_statistics.weighted_recall)?;
+        writeln!(&mut writer, ",")?;
+        write!(&mut writer, r#"  "weighted_f1_score": "#)?;
+        write!(&mut writer, "{}", derived_statistics.weighted_f1_score)?;
         writeln!(&mut writer, ",")?;
         write!(&mut writer, r#"  "kappa": "#)?;
         write!(&mut writer, "{}", derived_statistics.kappa)?;
@@ -56,7 +76,6 @@ impl Statistics {
         let mut row_sums = vec![0; self.confusion_matrix.len()];
         let mut column_sums = vec![0; self.confusion_matrix[0].len()];
         let mut samples = 0;
-
         for (row, values) in self.confusion_matrix.iter().enumerate() {
             for (col, count) in values.iter().enumerate() {
                 row_sums[row] += count;
@@ -70,7 +89,11 @@ impl Statistics {
 
         for (idx, row_sum) in row_sums.iter().copied().enumerate() {
             let val = self.confusion_matrix[idx][idx] as f64;
-            class_recall.push(val / row_sum as f64);
+            class_recall.push(if row_sum > 0 {
+                val / row_sum as f64
+            } else {
+                0.0
+            });
 
             p_o += val;
             samples += row_sum;
@@ -81,24 +104,43 @@ impl Statistics {
             class_precision.push(self.confusion_matrix[idx][idx] as f64 / column_sum as f64);
         }
 
-        let class_f_score = class_recall
+        let class_f1_score = class_recall
             .iter()
             .copied()
             .zip(class_precision.iter().copied())
             .map(|(r, p)| 2.0 * r * p / (r + p))
-            .collect();
+            .collect::<Vec<_>>();
 
         let mut p_e = 0.0;
         for (row_sum, column_sum) in row_sums.iter().copied().zip(column_sums.iter().copied()) {
             p_e += row_sum as f64 * column_sum as f64;
         }
         p_e /= (samples as f64) * (samples as f64);
+
+        let overall_accuracy = p_o;
+        let balanced_accuracy = class_recall.iter().sum::<f64>() / class_recall.len() as f64;
         let kappa = (p_o - p_e) / (1.0 - p_e);
+
+        let mut weighted_precision = 0.0;
+        let mut weighted_recall = 0.0;
+        let mut weighted_f1_score = 0.0;
+
+        for i in 0..row_sums.len() {
+            let weight = row_sums[i] as f64 / samples as f64;
+            weighted_precision += class_precision[i].nan_to_zero() * weight;
+            weighted_recall += class_recall[i].nan_to_zero() * weight;
+            weighted_f1_score += class_f1_score[i].nan_to_zero() * weight;
+        }
 
         DerivedStatistics {
             class_precision,
             class_recall,
-            class_f_score,
+            class_f1_score,
+            overall_accuracy,
+            balanced_accuracy,
+            weighted_precision,
+            weighted_recall,
+            weighted_f1_score,
             kappa,
         }
     }
@@ -179,6 +221,20 @@ impl ConfusionMatrixBuilder {
     }
 }
 
+trait FloatExt {
+    fn nan_to_zero(self) -> f64;
+}
+
+impl FloatExt for f64 {
+    fn nan_to_zero(self) -> f64 {
+        if self.is_nan() {
+            0.0
+        } else {
+            self
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use approx_eq::assert_approx_eq;
@@ -216,11 +272,10 @@ mod tests {
             confusion_matrix,
         };
 
-        const EPS: f64 = 1e-5;
         let derived_statistics = statistics.derived_statistics();
         let expected_recall = [
-            0.509554, 0.519231, 0.857143, 0.64557, 0.84375, 0.981481, 0.21256, 0.258901, 1.0,
-            0.422323, 0.666329, 0.465347, 0.83707, 0.306122, 0.0,
+            0.509554, 0.519231, 0.857143, 0.64557, 0.84375, 0.981481, 0.2125603, 0.2589014, 1.0,
+            0.422323, 0.666329, 0.465347, 0.83707, 0.3061224, 0.0,
         ];
 
         for (computed, expected) in derived_statistics
@@ -229,12 +284,12 @@ mod tests {
             .copied()
             .zip(expected_recall)
         {
-            assert_approx_eq!(computed, expected, EPS);
+            assert_approx_eq!(computed, expected);
         }
 
         let expected_precision = [
-            0.151229, 0.353712, 0.528736, 0.586207, 0.415385, 0.957831, 0.0443996, 0.518824,
-            0.949367, 0.118846, 0.783386, 0.179389, 0.800674, 0.0714286, 0.0,
+            0.1512287, 0.353712, 0.528736, 0.586207, 0.415385, 0.957831, 0.0443996, 0.518824,
+            0.949367, 0.1188455, 0.783386, 0.1793893, 0.800674, 0.0714286, 0.0,
         ];
 
         for (computed, expected) in derived_statistics
@@ -243,7 +298,7 @@ mod tests {
             .copied()
             .zip(expected_precision)
         {
-            assert_approx_eq!(computed, expected, EPS);
+            assert_approx_eq!(computed, expected);
         }
 
         let expected_f_score = [
@@ -254,29 +309,34 @@ mod tests {
             0.556701,
             0.969512,
             0.0734558,
-            0.345429,
+            0.3454285,
             0.974026,
             0.185492,
             0.720131,
             0.258953,
             0.818467,
-            0.11583,
+            0.1158301,
             f64::NAN,
         ];
 
         for (computed, expected) in derived_statistics
-            .class_f_score
+            .class_f1_score
             .iter()
             .copied()
             .zip(expected_f_score)
         {
             if expected.is_nan() {
-                assert!(computed.is_nan());
+                assert!(computed.is_nan())
             } else {
-                assert_approx_eq!(computed, expected, EPS);
+                assert_approx_eq!(computed, expected);
             }
         }
 
+        assert_approx_eq!(derived_statistics.overall_accuracy, 0.687645);
+        assert_approx_eq!(derived_statistics.balanced_accuracy, 0.568359);
+        assert_approx_eq!(derived_statistics.weighted_precision, 0.727932);
+        assert_approx_eq!(derived_statistics.weighted_recall, 0.687645);
+        assert_approx_eq!(derived_statistics.weighted_f1_score, 0.696799);
         assert_approx_eq!(derived_statistics.kappa, 0.515598);
     }
 }

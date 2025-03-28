@@ -15,7 +15,7 @@ use gdal::Dataset;
 use parking_lot::Mutex;
 use rayon::iter::{IntoParallelRefIterator as _, ParallelIterator as _};
 
-use crate::gdal_ext::{RasterBandExt, TypedBuffer};
+use crate::gdal_ext::TypedBuffer;
 
 #[derive(Debug, Parser)]
 pub struct TemporalResamplingArgs {
