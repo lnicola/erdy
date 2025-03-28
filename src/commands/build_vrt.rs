@@ -1,6 +1,6 @@
 use std::{
     fs::{self, File},
-    io::{BufWriter, Write},
+    io::{self, BufWriter, Write},
     path::{Path, PathBuf},
 };
 
@@ -79,12 +79,12 @@ impl BuildVrtArgs {
         }
 
         impl<W: Write> VrtBandWriter<'_, W> {
-            fn write_band(&mut self, path: &Path, resolution: usize) -> quick_xml::Result<()> {
+            fn write_band(&mut self, path: &Path, resolution: usize) -> io::Result<()> {
                 let source_size = (10980 * 10 / resolution).to_string();
                 self.writer
                     .create_element("VRTRasterBand")
                     .with_attributes([("dataType", "UInt16"), ("band", &self.index.to_string())])
-                    .write_inner_content::<_, quick_xml::Error>(|writer| {
+                    .write_inner_content(|writer| {
                         let mut element_writer = writer.create_element("SimpleSource");
                         if resolution != 10 {
                             if let Some(resampler) = self.resampler {
@@ -92,7 +92,7 @@ impl BuildVrtArgs {
                                     .with_attribute(("resampling", resampler.as_str()));
                             }
                         }
-                        element_writer.write_inner_content::<_, quick_xml::Error>(|writer| {
+                        element_writer.write_inner_content(|writer| {
                             writer
                                 .create_element("SourceFilename")
                                 .with_attribute(("relativeToVRT", "0"))
@@ -140,7 +140,7 @@ impl BuildVrtArgs {
         writer
             .create_element("VRTDataset")
             .with_attributes([("rasterXSize", "10980"), ("rasterYSize", "10980")])
-            .write_inner_content::<_, quick_xml::Error>(|writer| {
+            .write_inner_content(|writer| {
                 writer
                     .create_element("SRS")
                     .with_attribute(("dataAxisToSRSAxisMapping", "1,2"))
