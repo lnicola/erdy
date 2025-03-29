@@ -1,4 +1,4 @@
-FROM ghcr.io/osgeo/gdal:ubuntu-full-3.9.3
+FROM ghcr.io/osgeo/gdal:ubuntu-full-3.10.2
 RUN apt-get update
 RUN apt-get install -y --no-install-recommends gcc libc-dev pkg-config
 RUN --mount=type=cache,target=/root/.cargo \
@@ -16,5 +16,5 @@ RUN --mount=type=cache,target=/root/.cargo \
     --mount=type=cache,target=/app/target/release/.fingerprint \
     ~/.cargo/bin/cargo build --release
 
-FROM ghcr.io/osgeo/gdal:ubuntu-full-3.9.3
+FROM ghcr.io/osgeo/gdal:ubuntu-full-3.10.2
 COPY --from=0 /app/target/release/erdy /usr/local/bin/
