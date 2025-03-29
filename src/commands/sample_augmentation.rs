@@ -22,8 +22,6 @@ use rand::{
 };
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator};
 
-use crate::gdal_ext::FeatureExt;
-
 #[derive(Debug, Parser)]
 pub struct SampleAugmentationArgs {
     /// Input datasets
@@ -206,7 +204,7 @@ fn load_samples(
     let mut data = Vec::new();
     for feature in layer.features() {
         for &(idx, _, _) in included_fields {
-            let value = feature.field_as_double(idx as i32)?.unwrap();
+            let value = feature.field_as_double(idx)?.unwrap();
             data.push(value);
         }
     }
@@ -419,7 +417,7 @@ impl SampleAugmentationArgs {
                     for idx in 0..batch.rows() {
                         let mut feature = Feature::new(layer.defn())?;
                         if offset == 1 {
-                            feature.set_field_integer64_by_index(0, self.label);
+                            feature.set_field_integer64(0, self.label)?;
                         }
                         for (col_idx, (mut value, &(_, _, field_type))) in batch
                             .sample(idx)
@@ -438,7 +436,7 @@ impl SampleAugmentationArgs {
                             {
                                 value = value.round_ties_even();
                             }
-                            feature.set_field_double_by_index(offset + col_idx, value);
+                            feature.set_field_double(offset + col_idx, value)?;
                         }
                         feature.create(&layer)?;
                     }

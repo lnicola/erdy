@@ -14,7 +14,7 @@ use gdal_sys::{
 };
 use rand::{distr::StandardUniform, rngs::StdRng, Rng, SeedableRng};
 
-use crate::gdal_ext::{FeatureExt, RasterBandExt as _, TypedBuffer};
+use crate::gdal_ext::{RasterBandExt as _, TypedBuffer};
 
 #[derive(Debug, Parser)]
 pub struct SampleSelectionArgs {
@@ -259,7 +259,7 @@ impl SampleSelectionArgs {
                                 let layer = &layers[idx];
                                 let mut feature = Feature::new(layer.defn())?;
                                 feature.set_geometry(point)?;
-                                feature.set_field_integer_by_index(0, val as i32);
+                                feature.set_field_integer(0, val as i32)?;
                                 feature.create(layer)?;
                             }
                         }

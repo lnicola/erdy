@@ -384,50 +384,41 @@ impl SampleExtractionArgs {
                             for (field_idx, field_value) in point.original_fields.iter().enumerate()
                             {
                                 if let Some(field_value) = field_value {
-                                    feature.set_field_by_index(field_idx, field_value);
+                                    feature.set_field(field_idx, field_value)?;
                                 }
                             }
                             for band_idx in 0..band_count {
                                 let field_index = field_offset + band_idx;
                                 match sample_values[band_count * sample_idx + band_idx] {
                                     BandValue::U8(value) => {
-                                        feature
-                                            .set_field_integer_by_index(field_index, value as i32);
+                                        feature.set_field_integer(field_index, value as i32)?;
                                     }
                                     BandValue::I8(value) => {
-                                        feature
-                                            .set_field_integer_by_index(field_index, value as i32);
+                                        feature.set_field_integer(field_index, value as i32)?;
                                     }
                                     BandValue::U16(value) => {
-                                        feature
-                                            .set_field_integer_by_index(field_index, value as i32);
+                                        feature.set_field_integer(field_index, value as i32)?;
                                     }
                                     BandValue::I16(value) => {
-                                        feature
-                                            .set_field_integer_by_index(field_index, value as i32);
+                                        feature.set_field_integer(field_index, value as i32)?;
                                     }
                                     BandValue::U32(value) => {
-                                        feature
-                                            .set_field_integer_by_index(field_index, value as i32);
+                                        feature.set_field_integer(field_index, value as i32)?;
                                     }
                                     BandValue::I32(value) => {
-                                        feature.set_field_integer_by_index(field_index, value);
+                                        feature.set_field_integer(field_index, value)?;
                                     }
                                     BandValue::U64(value) => {
-                                        feature.set_field_integer64_by_index(
-                                            field_index,
-                                            value as i64,
-                                        );
+                                        feature.set_field_integer64(field_index, value as i64)?;
                                     }
                                     BandValue::I64(value) => {
-                                        feature.set_field_integer64_by_index(field_index, value);
+                                        feature.set_field_integer64(field_index, value)?;
                                     }
                                     BandValue::F32(value) => {
-                                        feature
-                                            .set_field_double_by_index(field_index, value as f64);
+                                        feature.set_field_double(field_index, value as f64)?;
                                     }
                                     BandValue::F64(value) => {
-                                        feature.set_field_double_by_index(field_index, value);
+                                        feature.set_field_double(field_index, value)?;
                                     }
                                 }
                             }

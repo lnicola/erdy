@@ -10,7 +10,7 @@ use clap::Parser;
 use gdal::{vector::LayerAccess, Dataset};
 use rayon::iter::{IntoParallelIterator as _, IntoParallelRefIterator as _, ParallelIterator as _};
 
-use crate::{confusion_matrix::ConfusionMatrixBuilder, gdal_ext::DefnExt};
+use crate::confusion_matrix::ConfusionMatrixBuilder;
 
 #[derive(Debug, Parser)]
 pub struct ComputeConfusionMatrixArgs {
@@ -68,8 +68,8 @@ fn process_file(
     let dataset = Dataset::open(path)?;
     let mut layer = dataset.layer(0)?;
     let defn = layer.defn();
-    let reference_idx = defn.get_field_index(reference)?;
-    let prediction_idx = defn.get_field_index(prediction)?;
+    let reference_idx = defn.field_index(reference)?;
+    let prediction_idx = defn.field_index(prediction)?;
 
     let mut matrix_builder = ConfusionMatrixBuilder::new();
     for feature in layer.features() {
