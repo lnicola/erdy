@@ -6,6 +6,7 @@ use std::{
     path::PathBuf,
     sync::Arc,
     thread::{self, JoinHandle},
+    time::Instant,
 };
 
 use anyhow::Result;
@@ -82,7 +83,14 @@ impl ParallelBlockReader {
                 for request in req_rx {
                     let block = {
                         let region_size = request.state.region_size;
+                        let now = Instant::now();
                         let dataset = request.dataset.lock();
+                        println!(
+                            "Dataset {:?} locked on thread {:?} in {:?}",
+                            dataset.c_dataset(),
+                            std::thread::current().id(),
+                            Instant::now() - now
+                        );
                         let band = dataset.rasterband(1).unwrap();
                         let size = band.size();
                         let window = (request.x * region_size.0, request.y * region_size.1);
@@ -107,8 +115,15 @@ impl ParallelBlockReader {
                             )
                             .unwrap();
 
-                        TypedBuffer::U16(buffer)
+                        let tb = TypedBuffer::U16(buffer);
                         // band.read_typed_block(request.x, request.y).unwrap()
+                        println!(
+                            "Dataset {:?} freed on thread {:?} in {:?}",
+                            dataset.c_dataset(),
+                            std::thread::current().id(),
+                            Instant::now() - now
+                        );
+                        tb
                     };
                     let blocks = {
                         let mut blocks = request.state.blocks.lock();
@@ -207,7 +222,7 @@ impl TemporalResamplingArgs {
             .collect::<gdal::errors::Result<Vec<_>>>()?
             .into_boxed_slice();
 
-        println!("Opened");
+        println!("Opened {} datasets", datasets.len());
 
         let block_reader = ParallelBlockReader::new(datasets, self.io_threads.unwrap_or(32))?;
 
