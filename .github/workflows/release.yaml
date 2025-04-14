@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+
+env:
+  PACKAGE_NAME: erdy
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        run: echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgdal-dev
+
+      - name: Install Rust
+        run: |
+          rustup update --no-self-update stable
+          rustup default stable
+
+      - name: Build release binary
+        run: |
+          cargo build --release
+
+      - name: Package binary
+        run: |
+          cd target/release
+          tar czf $PACKAGE_NAME-$VERSION-x64-64-unknown-linux-gnu.tar.gz $PACKAGE_NAME
+          b2sum $PACKAGE_NAME-$VERSION-x64-64-unknown-linux-gnu.tar.gz > $PACKAGE_NAME-$VERSION-x64-64-unknown-linux-gnu.tar.gz.b2
+
+      - name: Create GitHub Release
+        run: |
+          gh release create "$VERSION" \
+            --draft \
+            --title "Release $VERSION" \
+            --generate-notes \
+            target/release/$PACKAGE_NAME-$VERSION-x64-64-unknown-linux-gnu.tar.gz*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
