@@ -7,44 +7,112 @@ on:
 
 env:
   PACKAGE_NAME: erdy
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
 
 jobs:
-  build:
+  extract-version:
     runs-on: ubuntu-latest
+
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+
+    steps:
+      - name: Extract version from tag
+        id: extract
+        run: echo "VERSION=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+  build-artifacts:
+    runs-on: ubuntu-latest
+    needs: extract-version
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Get version from tag
-        run: echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+        with:
+          fetch-depth: 1
 
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libgdal-dev
 
-      - name: Install Rust
+      - name: Update Rust
         run: |
           rustup update --no-self-update stable
           rustup default stable
 
-      - name: Build release binary
+      - name: Build
         run: |
           cargo build --release
 
-      - name: Package binary
+      - name: Package binary and compute checksum
         run: |
           cd target/release
-          tar czf $PACKAGE_NAME-$VERSION-x64-64-unknown-linux-gnu.tar.gz $PACKAGE_NAME
-          b2sum $PACKAGE_NAME-$VERSION-x64-64-unknown-linux-gnu.tar.gz > $PACKAGE_NAME-$VERSION-x64-64-unknown-linux-gnu.tar.gz.b2
+          tar czf ${{ env.PACKAGE_NAME }}-${{ needs.extract-version.outputs.version }}-x64-64-unknown-linux-gnu.tar.gz ${{ env.PACKAGE_NAME }}
+          b2sum ${{ env.PACKAGE_NAME }}-${{ needs.extract-version.outputs.version }}-x64-64-unknown-linux-gnu.tar.gz > ${{ env.PACKAGE_NAME }}-${{ needs.extract-version.outputs.version }}-x64-64-unknown-linux-gnu.tar.gz.b2
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PACKAGE_NAME }}-release
+          compression-level: 0
+          path: |
+            target/release/${{ env.PACKAGE_NAME }}-${{ needs.extract-version.outputs.version }}-x64-64-unknown-linux-gnu.tar.gz
+            target/release/${{ env.PACKAGE_NAME }}-${{ needs.extract-version.outputs.version }}-x64-64-unknown-linux-gnu.tar.gz.b2
+
+  container-image:
+    runs-on: ubuntu-latest
+    needs: extract-version
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Log in to ghcr.io
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build container image
+        run: |
+          podman build \
+            --build-arg IMAGE_SOURCE="${{ github.server_url }}/${{ github.repository }}" \
+            --build-arg IMAGE_VERSION="${{ needs.extract-version.outputs.version }}" \
+            --build-arg PACKAGE_NAME="${{ env.PACKAGE_NAME }}" \
+            --tag "$IMAGE_NAME:${{ needs.extract-version.outputs.version }}" \
+            --tag "$IMAGE_NAME:latest" \
+            -f Containerfile .
+
+      - name: Push to ghcr.io
+        run: |
+          podman push "$IMAGE_NAME:${{ needs.extract-version.outputs.version }}"
+          podman push "$IMAGE_NAME:latest"
+
+  publish-release:
+    runs-on: ubuntu-latest
+    needs: [extract-version, build-artifacts]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Download packaged binary
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.PACKAGE_NAME }}-release
+          path: ./release
 
       - name: Create GitHub Release
         run: |
-          gh release create "$VERSION" \
-            --draft \
-            --title "Release $VERSION" \
+          gh release create "${{ needs.extract-version.outputs.version }}" \
             --generate-notes \
-            target/release/$PACKAGE_NAME-$VERSION-x64-64-unknown-linux-gnu.tar.gz*
+            --draft \
+            ./release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
