@@ -36,8 +36,8 @@ pub enum Command {
     SampleExtraction(SampleExtractionArgs),
     /// Augment a vector dataset.
     SampleAugmentation(SampleAugmentationArgs),
-    /// Sample labelled points from a raster.
+    /// Sample labelled points from a raster, with control over class distribution.
     SampleSelection(SampleSelectionArgs),
-    /// Gap-fill and interpolate a time series of images.
+    /// Gap-fill and interpolate a time series of images at given output dates.
     TemporalResampling(TemporalResamplingArgs),
 }
