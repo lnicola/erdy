@@ -11,7 +11,7 @@ use std::{
 
 use anyhow::Result;
 use clap::Parser;
-use flume::{Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender};
 use gdal::Dataset;
 use parking_lot::Mutex;
 use rayon::iter::{IntoParallelRefIterator as _, ParallelIterator as _};
@@ -73,7 +73,7 @@ struct ParallelBlockReader {
 
 impl ParallelBlockReader {
     pub fn new(datasets: Box<[Arc<Mutex<Dataset>>]>, threads: usize) -> gdal::errors::Result<Self> {
-        let (req_tx, req_rx) = flume::unbounded();
+        let (req_tx, req_rx) = crossbeam_channel::unbounded();
 
         let mut workers = Vec::new();
         for _ in 0..threads {
