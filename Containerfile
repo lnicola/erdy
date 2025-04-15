@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 
-FROM ghcr.io/osgeo/gdal:ubuntu-full-3.10.2 AS builder
+FROM ghcr.io/osgeo/gdal:ubuntu-full-3.10.3 AS builder
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends gcc libc-dev pkg-config
@@ -21,7 +21,7 @@ RUN --mount=type=cache,target=/root/.cargo \
     --mount=type=cache,target=/app/target/release/.fingerprint \
     ~/.cargo/bin/cargo build --release
 
-FROM ghcr.io/osgeo/gdal:ubuntu-full-3.10.2
+FROM ghcr.io/osgeo/gdal:ubuntu-full-3.10.3
 
 ARG IMAGE_SOURCE
 ARG IMAGE_VERSION
