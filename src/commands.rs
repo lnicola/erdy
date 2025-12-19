@@ -2,11 +2,13 @@ mod band_select;
 mod batch_translate;
 mod build_vrt;
 mod compute_confusion_matrix;
+mod raster_predict;
 mod remap_confusion_matrix;
 mod sample_augmentation;
 mod sample_extraction;
 mod sample_selection;
 mod temporal_resampling;
+mod vector_predict;
 
 use clap::Subcommand;
 
@@ -14,11 +16,13 @@ pub use band_select::BandSelectArgs;
 pub use batch_translate::BatchTranslateArgs;
 pub use build_vrt::BuildVrtArgs;
 pub use compute_confusion_matrix::ComputeConfusionMatrixArgs;
+pub use raster_predict::RasterPredictArgs;
 pub use remap_confusion_matrix::RemapConfusionMatrixArgs;
 pub use sample_augmentation::SampleAugmentationArgs;
 pub use sample_extraction::SampleExtractionArgs;
 pub use sample_selection::SampleSelectionArgs;
 pub use temporal_resampling::TemporalResamplingArgs;
+pub use vector_predict::VectorPredictArgs;
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
@@ -30,6 +34,8 @@ pub enum Command {
     BuildVrt(BuildVrtArgs),
     /// Compute the confusion matrix for a vector dataset
     ComputeConfusionMatrix(ComputeConfusionMatrixArgs),
+    /// Predict values for a raster file.
+    RasterPredict(RasterPredictArgs),
     /// Remap the labels in a confusion matrix
     RemapConfusionMatrix(RemapConfusionMatrixArgs),
     /// Sample an image at given positions and output a table of the band values.
@@ -40,4 +46,6 @@ pub enum Command {
     SampleSelection(SampleSelectionArgs),
     /// Gap-fill and interpolate a time series of images at given output dates.
     TemporalResampling(TemporalResamplingArgs),
+    /// Predict values for a vector file.
+    VectorPredict(VectorPredictArgs),
 }
