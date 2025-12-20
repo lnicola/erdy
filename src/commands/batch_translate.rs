@@ -78,7 +78,7 @@ impl BatchTranslateArgs {
             let Ok(temp) = Builder::new()
                 .prefix(&format!("temp_{}", entry.file_name().to_string_lossy()))
                 .suffix(&format!(".{}", self.extension))
-                .keep(true)
+                .disable_cleanup(true)
                 .tempfile_in(parent)
             else {
                 let path = entry.path().display();

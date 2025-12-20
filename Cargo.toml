@@ -1,6 +1,6 @@
 [package]
 name = "erdy"
-rust-version = "1.77"
+rust-version = "1.80"
 version = "0.2.4"
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -18,11 +18,11 @@ crossbeam-channel = "0.5.15"
 faster-hex = "0.10"
 gdal = { version = "0.19", git = "https://github.com/georust/gdal" }
 gdal-sys = { version = "0.12", git = "https://github.com/georust/gdal" }
-indicatif = "0.17"
+indicatif = "0.18"
 itertools = "0.14.0"
 num-traits = "0.2"
 parking_lot = "0.12.3"
-quick-xml = "0.37"
+quick-xml = "0.38"
 rand = { version = "0.9", default-features = false, features = [
     "os_rng",
     "small_rng",
