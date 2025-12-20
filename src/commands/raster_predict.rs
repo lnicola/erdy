@@ -201,8 +201,11 @@ impl RasterPredictArgs {
                         }
                         drop(partial_tx);
 
-                        let mut pending: HashMap<(usize, usize), (usize, Vec<Vec<f32>>)> =
-                            HashMap::new();
+                        #[allow(clippy::type_complexity)]
+                        let mut pending: HashMap<
+                            (usize, usize),
+                            (usize, Vec<Vec<f32>>),
+                        > = HashMap::new();
 
                         for part in partial_rx {
                             let (count, features) = pending
