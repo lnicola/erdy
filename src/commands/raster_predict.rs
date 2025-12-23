@@ -35,11 +35,11 @@ pub struct RasterPredictArgs {
     block_size: usize,
 
     /// GDAL creation options
-    #[arg(long = "co", default_values = &["TILED=YES", "COMPRESS=DEFLATE"])]
+    #[arg(long, num_args = 0..)]
     creation_options: Vec<String>,
 
     /// I/O threads
-    #[arg(default_value_t = 4)]
+    #[arg(long, default_value_t = 4)]
     io_threads: usize,
 }
 
