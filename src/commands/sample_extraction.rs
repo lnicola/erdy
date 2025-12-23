@@ -24,7 +24,7 @@ use gdal::{
 };
 
 use crate::{
-    gdal_ext::{FeatureExt, TypedBuffer},
+    gdal_ext::{DatasetExt, FeatureExt, TypedBuffer},
     threaded_block_reader::{BlockFinalizer, BlockReducer, ThreadedBlockReader},
 };
 
@@ -372,62 +372,68 @@ impl SampleExtractionArgs {
                     }
                     for (data, range) in rx {
                         let (sample_values, block_points) = &*data;
-                        let tx = output.start_transaction()?;
-                        let output_layer = tx.layer(0)?;
-                        for (idx, point) in block_points.points[range.clone()].iter().enumerate() {
-                            let sample_idx = idx + range.start;
-                            let mut feature = Feature::new(output_layer.defn())?;
-                            if self.copy_fid {
-                                feature.set_fid(point._fid)?;
-                            }
-                            let field_offset = point.original_fields.len();
-                            for (field_idx, field_value) in point.original_fields.iter().enumerate()
+                        output.maybe_run_in_batch(|ds| {
+                            let output_layer = ds.layer(0)?;
+                            for (idx, point) in
+                                block_points.points[range.clone()].iter().enumerate()
                             {
-                                if let Some(field_value) = field_value {
-                                    feature.set_field(field_idx, field_value)?;
+                                let sample_idx = idx + range.start;
+                                let mut feature = Feature::new(output_layer.defn())?;
+                                if self.copy_fid {
+                                    feature.set_fid(point._fid)?;
                                 }
-                            }
-                            for band_idx in 0..band_count {
-                                let field_index = field_offset + band_idx;
-                                match sample_values[band_count * sample_idx + band_idx] {
-                                    BandValue::U8(value) => {
-                                        feature.set_field_integer(field_index, value as i32)?;
-                                    }
-                                    BandValue::I8(value) => {
-                                        feature.set_field_integer(field_index, value as i32)?;
-                                    }
-                                    BandValue::U16(value) => {
-                                        feature.set_field_integer(field_index, value as i32)?;
-                                    }
-                                    BandValue::I16(value) => {
-                                        feature.set_field_integer(field_index, value as i32)?;
-                                    }
-                                    BandValue::U32(value) => {
-                                        feature.set_field_integer(field_index, value as i32)?;
-                                    }
-                                    BandValue::I32(value) => {
-                                        feature.set_field_integer(field_index, value)?;
-                                    }
-                                    BandValue::U64(value) => {
-                                        feature.set_field_integer64(field_index, value as i64)?;
-                                    }
-                                    BandValue::I64(value) => {
-                                        feature.set_field_integer64(field_index, value)?;
-                                    }
-                                    BandValue::F32(value) => {
-                                        feature.set_field_double(field_index, value as f64)?;
-                                    }
-                                    BandValue::F64(value) => {
-                                        feature.set_field_double(field_index, value)?;
+                                let field_offset = point.original_fields.len();
+                                for (field_idx, field_value) in
+                                    point.original_fields.iter().enumerate()
+                                {
+                                    if let Some(field_value) = field_value {
+                                        feature.set_field(field_idx, field_value)?;
                                     }
                                 }
+                                for band_idx in 0..band_count {
+                                    let field_index = field_offset + band_idx;
+                                    match sample_values[band_count * sample_idx + band_idx] {
+                                        BandValue::U8(value) => {
+                                            feature.set_field_integer(field_index, value as i32)?;
+                                        }
+                                        BandValue::I8(value) => {
+                                            feature.set_field_integer(field_index, value as i32)?;
+                                        }
+                                        BandValue::U16(value) => {
+                                            feature.set_field_integer(field_index, value as i32)?;
+                                        }
+                                        BandValue::I16(value) => {
+                                            feature.set_field_integer(field_index, value as i32)?;
+                                        }
+                                        BandValue::U32(value) => {
+                                            feature.set_field_integer(field_index, value as i32)?;
+                                        }
+                                        BandValue::I32(value) => {
+                                            feature.set_field_integer(field_index, value)?;
+                                        }
+                                        BandValue::U64(value) => {
+                                            feature
+                                                .set_field_integer64(field_index, value as i64)?;
+                                        }
+                                        BandValue::I64(value) => {
+                                            feature.set_field_integer64(field_index, value)?;
+                                        }
+                                        BandValue::F32(value) => {
+                                            feature.set_field_double(field_index, value as f64)?;
+                                        }
+                                        BandValue::F64(value) => {
+                                            feature.set_field_double(field_index, value)?;
+                                        }
+                                    }
+                                }
+                                let mut geometry = Geometry::empty(OGRwkbGeometryType::wkbPoint)?;
+                                geometry.add_point_2d((point.orig_x, point.orig_y));
+                                feature.set_geometry(geometry)?;
+                                feature.create(&output_layer)?;
                             }
-                            let mut geometry = Geometry::empty(OGRwkbGeometryType::wkbPoint)?;
-                            geometry.add_point_2d((point.orig_x, point.orig_y));
-                            feature.set_geometry(geometry)?;
-                            feature.create(&output_layer)?;
-                        }
-                        tx.commit()?;
+
+                            Ok(())
+                        })?;
                     }
                     {
                         let _guard = mutex.lock();
