@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use crossbeam_channel::bounded;
 use gdal::DriverType;
@@ -23,8 +23,9 @@ pub struct RasterPredictArgs {
 
     /// Input rasters. Each band is treated as a feature.
     /// Multiple rasters will be logically concatenated (bands 1..N of image 1, then 1..M of image 2, etc.)
+    /// Supports extended filenames like "image.tif?bands=1,3" to select specific bands.
     #[arg(short, long, num_args = 1..)]
-    inputs: Vec<PathBuf>,
+    inputs: Vec<String>,
 
     /// Output raster
     #[arg(short, long)]
@@ -41,6 +42,41 @@ pub struct RasterPredictArgs {
     /// I/O threads
     #[arg(long, default_value_t = 4)]
     io_threads: usize,
+}
+
+struct InputSource {
+    path: PathBuf,
+    bands: Option<Vec<usize>>,
+}
+
+impl InputSource {
+    fn parse(input: &str) -> Result<Self> {
+        if let Some((path_str, query)) = input.split_once('?') {
+            let path = PathBuf::from(path_str);
+            let mut bands = None;
+            for pair in query.split('&') {
+                if let Some((key, value)) = pair.split_once('=') {
+                    if key == "bands" {
+                        let indices = value
+                            .split(',')
+                            .map(|s| {
+                                s.trim()
+                                    .parse::<usize>()
+                                    .map_err(|e| anyhow!("Invalid band index '{}': {}", s, e))
+                            })
+                            .collect::<Result<Vec<_>, _>>();
+                        bands = Some(indices?);
+                    }
+                }
+            }
+            Ok(Self { path, bands })
+        } else {
+            Ok(Self {
+                path: PathBuf::from(input),
+                bands: None,
+            })
+        }
+    }
 }
 
 struct BlockData {
@@ -85,16 +121,42 @@ impl RasterPredictArgs {
             return Err(anyhow!("No input rasters provided"));
         }
 
+        let parsed_inputs = self
+            .inputs
+            .iter()
+            .map(|s| InputSource::parse(s))
+            .collect::<Result<Vec<_>, _>>()?;
+
         let (width, height, projection, geo_transform, total_bands) = {
-            let first_ds = Dataset::open(&self.inputs[0])?;
+            let first_ds = Dataset::open(&parsed_inputs[0].path)
+                .with_context(|| format!("Failed to open {}", parsed_inputs[0].path.display()))?;
             let (w, h) = first_ds.raster_size();
             let mut total = 0;
-            for path in &self.inputs {
-                let ds = Dataset::open(path)?;
+            for input in &parsed_inputs {
+                let ds = Dataset::open(&input.path)
+                    .with_context(|| format!("Failed to open {}", input.path.display()))?;
                 if ds.raster_size() != (w, h) {
-                    anyhow::bail!("Size mismatch in input raster: {:?}", path);
+                    anyhow::bail!("Size mismatch in input raster: {}", input.path.display());
                 }
-                total += ds.raster_count();
+
+                let count = if let Some(bands) = &input.bands {
+                    // Verify bands exist
+                    let max_band = ds.raster_count() as usize;
+                    for &b in bands {
+                        if b == 0 || b > max_band {
+                            anyhow::bail!(
+                                "Band index {} out of range for {:?} (max {})",
+                                b,
+                                input.path,
+                                max_band
+                            );
+                        }
+                    }
+                    bands.len()
+                } else {
+                    ds.raster_count() as usize
+                };
+                total += count;
             }
             (
                 w,
@@ -120,19 +182,31 @@ impl RasterPredictArgs {
         std::thread::scope(|s| -> Result<()> {
             s.spawn(|| {
                 let res = (|| -> Result<()> {
-                    let datasets = self
-                        .inputs
+                    let datasets = parsed_inputs
                         .iter()
-                        .map(|path| Dataset::open(path).map(Mutex::new))
+                        .map(|input| Dataset::open(&input.path).map(Mutex::new))
                         .collect::<Result<Vec<_>, _>>()?;
                     let dataset_count = datasets.len();
 
                     let mut offsets = Vec::with_capacity(dataset_count);
                     let mut current_offset = 0;
-                    for ds in &datasets {
-                        let count = ds.lock().unwrap().raster_count();
+
+                    let dataset_bands = parsed_inputs
+                        .iter()
+                        .zip(&datasets)
+                        .map(|(input, ds)| {
+                            if let Some(bands) = &input.bands {
+                                bands.clone()
+                            } else {
+                                let count = ds.lock().unwrap().raster_count();
+                                (1..=count as usize).collect()
+                            }
+                        })
+                        .collect::<Vec<Vec<_>>>();
+
+                    for bands in &dataset_bands {
                         offsets.push(current_offset);
-                        current_offset += count;
+                        current_offset += bands.len();
                     }
 
                     let tasks = (0..y_blocks)
@@ -150,6 +224,7 @@ impl RasterPredictArgs {
                             let partial_tx = partial_tx.clone();
                             let tasks = &tasks;
                             let datasets = &datasets;
+                            let dataset_bands = &dataset_bands;
                             handles.push(s.spawn(move || -> Result<()> {
                                 loop {
                                     let (bx, by, ds_idx) = match tasks.lock().unwrap().next() {
@@ -169,7 +244,9 @@ impl RasterPredictArgs {
                                     let mut features = Vec::new();
                                     {
                                         let ds = datasets[ds_idx].lock().unwrap();
-                                        for b in 1..=ds.raster_count() {
+                                        let bands_to_read = &dataset_bands[ds_idx];
+
+                                        for &b in bands_to_read {
                                             let band = ds.rasterband(b)?;
                                             let data = band.read_as::<f32>(
                                                 (x_off as isize, y_off as isize),
