@@ -35,5 +35,6 @@ fn main() -> Result<()> {
         Command::TemporalResampling(mut args) => args.run(),
         Command::VectorPredict(args) => args.run(),
         Command::ComputeClassCounts(args) => args.run(),
+        Command::MergeClassCounts(args) => args.run(),
     }
 }

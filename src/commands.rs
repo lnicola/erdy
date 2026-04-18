@@ -3,6 +3,7 @@ mod batch_translate;
 mod build_vrt;
 mod compute_class_counts;
 mod compute_confusion_matrix;
+mod merge_class_counts;
 mod raster_predict;
 mod remap_confusion_matrix;
 mod sample_augmentation;
@@ -18,6 +19,7 @@ pub use batch_translate::BatchTranslateArgs;
 pub use build_vrt::BuildVrtArgs;
 pub use compute_class_counts::ComputeClassCountsArgs;
 pub use compute_confusion_matrix::ComputeConfusionMatrixArgs;
+pub use merge_class_counts::MergeClassCountsArgs;
 pub use raster_predict::RasterPredictArgs;
 pub use remap_confusion_matrix::RemapConfusionMatrixArgs;
 pub use sample_augmentation::SampleAugmentationArgs;
@@ -52,4 +54,6 @@ pub enum Command {
     VectorPredict(VectorPredictArgs),
     /// Compute the number of pixels for each value in a list of single-band rasters.
     ComputeClassCounts(ComputeClassCountsArgs),
+    /// Merge class counts from multiple CSVs into a single CSV.
+    MergeClassCounts(MergeClassCountsArgs),
 }
