@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/root/.cargo \
 FROM ghcr.io/osgeo/gdal:ubuntu-full-3.12.1
 
 LABEL org.opencontainers.image.source="https://github.com/lnicola/erdy"
-LABEL org.opencontainers.image.version="0.2.5"
+LABEL org.opencontainers.image.version="0.3.0"
 
 RUN curl --tlsv1.2 -fsLS https://github.com/catboost/catboost/releases/download/v1.2.8/libcatboostmodel-linux-x86_64-1.2.8.so -o /usr/local/lib/libcatboostmodel-1.2.8.so && \
     chmod +x /usr/local/lib/libcatboostmodel-1.2.8.so && \
