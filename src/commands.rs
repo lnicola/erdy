@@ -1,6 +1,7 @@
 mod band_select;
 mod batch_translate;
 mod build_vrt;
+mod compute_class_counts;
 mod compute_confusion_matrix;
 mod raster_predict;
 mod remap_confusion_matrix;
@@ -15,6 +16,7 @@ use clap::Subcommand;
 pub use band_select::BandSelectArgs;
 pub use batch_translate::BatchTranslateArgs;
 pub use build_vrt::BuildVrtArgs;
+pub use compute_class_counts::ComputeClassCountsArgs;
 pub use compute_confusion_matrix::ComputeConfusionMatrixArgs;
 pub use raster_predict::RasterPredictArgs;
 pub use remap_confusion_matrix::RemapConfusionMatrixArgs;
@@ -42,10 +44,12 @@ pub enum Command {
     SampleExtraction(SampleExtractionArgs),
     /// Augment a vector dataset.
     SampleAugmentation(SampleAugmentationArgs),
-    /// Sample labelled points from a raster, with control over class distribution.
+    /// Distribute labelled points in a raster into one or more tables, with control over the output selection probabilities.
     SampleSelection(SampleSelectionArgs),
     /// Gap-fill and interpolate a time series of images at given output dates.
     TemporalResampling(TemporalResamplingArgs),
     /// Predict values for a vector file.
     VectorPredict(VectorPredictArgs),
+    /// Compute the number of pixels for each value in a list of single-band rasters.
+    ComputeClassCounts(ComputeClassCountsArgs),
 }
