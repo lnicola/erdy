@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 
-FROM ghcr.io/osgeo/gdal:ubuntu-full-3.12.1 AS builder
+FROM ghcr.io/lnicola/gdal:3.12.3 AS builder
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends gcc libc-dev pkg-config && \
@@ -24,7 +24,7 @@ RUN --mount=type=cache,target=/root/.cargo \
     --mount=type=cache,target=/app/target/release/.fingerprint \
     RUSTFLAGS="-L /usr/local/lib" ~/.cargo/bin/cargo build --release
 
-FROM ghcr.io/osgeo/gdal:ubuntu-full-3.12.1
+FROM ghcr.io/lnicola/gdal:3.12.3
 
 LABEL org.opencontainers.image.source="https://github.com/lnicola/erdy"
 LABEL org.opencontainers.image.version="0.3.0"
